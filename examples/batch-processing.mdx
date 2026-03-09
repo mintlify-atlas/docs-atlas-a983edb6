@@ -1,0 +1,207 @@
+---
+title: 'Batch Processing Example'
+description: 'Extract structured data from multiple CVs using Pydantic models'
+icon: 'layer-group'
+---
+
+## Overview
+
+This example demonstrates how to process multiple CVs in batch, extracting structured data using Pydantic models and the LLM. Perfect for building talent databases from resume collections.
+
+## Define the Data Schema
+
+First, create a Pydantic model to structure the extracted data:
+
+```python
+import glob
+import pandas as pd
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
+from langchain_community.document_loaders import PyPDFLoader
+
+# Define the data schema
+class PerfilEstudiante(BaseModel):
+    # Personal Information
+    nombre: str = Field(description="Student's full name")
+    email: str = Field(description="University or personal email")
+    ubicacion: str = Field(description="City/Country")
+
+    # Academic Profile
+    universidad: str = Field(description="Name of university or institute")
+    carrera: str = Field(description="Major being studied (e.g., Software Engineering)")
+    ciclo_actual: str = Field(description="Current semester or cycle (e.g., 7th Semester, Graduate)")
+
+    # Tech Talent
+    stack_principal: list = Field(description="List of top 5 languages/technologies they master")
+    proyectos_destacados: list = Field(description="Names of academic projects, thesis, or freelance work mentioned")
+
+    # Profile Evaluation
+    tipo_perfil: str = Field(description="Classify as: Backend, Frontend, Data, Fullstack, or Management")
+    potencial_contratacion: str = Field(description="Brief justification for why to hire them as an intern")
+
+parser = JsonOutputParser(pydantic_object=PerfilEstudiante)
+```
+
+## Create the Extraction Prompt
+
+Design a prompt that guides the LLM to extract data focusing on potential:
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+template_estudiantes = """
+You are an Expert in Youth Employability and IT Recruitment.
+Analyze this student's CV and extract structured data.
+
+USE THE FOLLOWING JSON FORMAT:
+{format_instructions}
+
+EXTRACTION RULES (Focus on Potential):
+
+1. ACADEMIC:
+   - Look for current cycle (e.g., "VI Cycle", "7th", "Graduate"). If not stated, infer from dates.
+   - University: Extract main name (e.g., "UTP", "UPC", "San Marcos").
+
+2. PROJECTS (Key for juniors):
+   - Look for sections like "Academic Projects", "Freelance", or "Experience".
+   - Extract concrete project names (e.g., "Library System", "Recycling App").
+   - DO NOT put generic company names, look for WHAT THEY DID.
+
+3. PROFILE TYPE:
+   - Analyze their skills.
+   - If they know Python + Pandas -> "Data".
+   - If they know React + Node -> "Fullstack".
+   - If they know Java + Spring -> "Backend".
+
+CV TEXT:
+{context}
+"""
+
+prompt_extract = ChatPromptTemplate.from_template(template_estudiantes)
+chain_extract = prompt_extract | llm | parser
+```
+
+## Batch Processing Execution
+
+Process all CVs in a directory:
+
+```python
+resultados = []
+archivos = glob.glob("cvs_estudiantes_final/*.pdf")
+
+print(f"Analyzing potential of {len(archivos)} students with AI...")
+
+for pdf in archivos:
+    try:
+        # Load PDF
+        loader = PyPDFLoader(pdf)
+        pages = loader.load()
+        texto_completo = "\n".join([p.page_content for p in pages])
+
+        # Invoke Gemini
+        data = chain_extract.invoke({
+            "context": texto_completo,
+            "format_instructions": parser.get_format_instructions()
+        })
+
+        # Add source filename
+        data['archivo_origen'] = pdf.split("/")[-1]
+        resultados.append(data)
+
+        print(f"Processed: {data['nombre']} ({data['ciclo_actual']}) -> {data['tipo_perfil']}")
+
+    except Exception as e:
+        print(f"Error reading {pdf}: {e}")
+```
+
+## Create a DataFrame
+
+Convert the results into a structured DataFrame:
+
+```python
+print("\nTALENT TABLE (REVERSE MATCH):")
+df_talent = pd.DataFrame(resultados)
+
+cols = ["nombre", "universidad", "ciclo_actual", "tipo_perfil", 
+        "stack_principal", "potencial_contratacion"]
+
+# Only show columns that exist
+cols_existentes = [c for c in cols if c in df_talent.columns]
+print(df_talent[cols_existentes])
+```
+
+## Expected Output
+
+```
+Analyzing potential of 5 students with AI...
+Processed: FERNANDA PAREDES (9no Ciclo) -> Data
+Processed: XIMENA RIOS (9no ciclo) -> Fullstack
+Processed: NICOLAS PAREDES (7mo Ciclo) -> Fullstack
+Processed: LUCIANA CORDOVA (8vo ciclo) -> Fullstack
+Processed: FERNANDA MENDOZA (8vo Ciclo) -> Fullstack
+
+TALENT TABLE (REVERSE MATCH):
+```
+
+| nombre | universidad | ciclo_actual | tipo_perfil | stack_principal | potencial_contratacion |
+|--------|------------|-------------|-------------|----------------|----------------------|
+| FERNANDA PAREDES | UTP | 9no Ciclo | Data | [Python, PowerBI, Java, Spring Boot] | Strong candidate for Data Analyst with Hackathon experience... |
+| XIMENA RIOS | San Marcos | 9no ciclo | Fullstack | [Python, FastAPI, Java, React, Spring Boot] | Advanced student (9th cycle) with practical experience... |
+| NICOLAS PAREDES | UNI | 7mo Ciclo | Fullstack | [Python, FastAPI, SQL (PostgreSQL), React, Spring Boot] | Advanced student (7th cycle) with focus on full-stack development... |
+| LUCIANA CORDOVA | UNI | 8vo ciclo | Fullstack | [Python, FastAPI, Java (Spring Boot), React, SQL] | 8th cycle candidate with experience in academic projects... |
+| FERNANDA MENDOZA | UNI | 8vo Ciclo | Fullstack | [React, Java, Python, PowerBI, Excel] | 8th cycle student with practical experience in web development... |
+
+## Export to Excel
+
+Save the talent database for further analysis:
+
+```python
+import pandas as pd
+
+# Export DataFrame
+nombre_archivo = "Base_Talento_Estudiantes.xlsx"
+df_talent.to_excel(nombre_archivo, index=False)
+
+print(f"Excel file generated: {nombre_archivo}")
+```
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Structured Extraction">
+    Uses Pydantic models to ensure consistent data structure across all CVs
+  </Accordion>
+  
+  <Accordion title="AI-Powered Analysis">
+    The LLM intelligently extracts and categorizes information, even inferring missing data
+  </Accordion>
+  
+  <Accordion title="Scalable Processing">
+    Process hundreds of CVs with the same code - just point to a different directory
+  </Accordion>
+  
+  <Accordion title="Export Ready">
+    Results are immediately ready for Excel export or database insertion
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Tips
+
+<Tip>
+**Custom Fields**: Modify the `PerfilEstudiante` model to extract additional fields like certifications, languages, or soft skills.
+</Tip>
+
+<Warning>
+**API Rate Limits**: When processing large batches, consider implementing rate limiting or batching to avoid API throttling.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Visualization" icon="chart-line" href="/examples/visualization">
+    Create dashboards from extracted data
+  </Card>
+  <Card title="Basic Query" icon="magnifying-glass" href="/examples/basic-query">
+    Query individual profiles
+  </Card>
+</CardGroup>

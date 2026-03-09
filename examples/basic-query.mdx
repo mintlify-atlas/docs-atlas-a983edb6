@@ -1,0 +1,162 @@
+---
+title: 'Basic Query Example'
+description: 'Learn how to query a single CV using RAG'
+icon: 'magnifying-glass'
+---
+
+## Overview
+
+This example demonstrates how to query a single CV using the RAG (Retrieval Augmented Generation) approach. You'll learn how to load a PDF resume, vectorize it, and ask questions about the candidate's profile.
+
+## Setup
+
+First, configure the LLM and embedding models:
+
+```python
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# Ensure API key is set
+if not os.getenv("GOOGLE_API_KEY"):
+    raise ValueError("You must set the GOOGLE_API_KEY environment variable")
+
+# Initialize LLM
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0
+)
+
+# Initialize embeddings model
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
+print("LLM configured successfully.")
+```
+
+## Loading and Vectorizing the CV
+
+Load a CV PDF and create a vector store for semantic search:
+
+```python
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+import os, random
+
+# 1. Select a CV file
+carpeta_fuente = "cvs_estudiantes_final"
+
+# Get available files
+archivos_disponibles = os.listdir(carpeta_fuente)
+if not archivos_disponibles:
+    raise Exception("No CVs found. Make sure to generate them first.")
+
+# Choose one randomly
+archivo_elegido = random.choice(archivos_disponibles)
+ruta_archivo = f"{carpeta_fuente}/{archivo_elegido}"
+
+print(f"📂 Selected student profile: '{archivo_elegido}'")
+print("⏳ Reading PDF and creating vectors...")
+
+# 2. Load and vectorize
+loader = PyPDFLoader(ruta_archivo)
+docs = loader.load()
+vectorstore = FAISS.from_documents(docs, embeddings)
+retriever = vectorstore.as_retriever()
+```
+
+## Creating the Query Chain
+
+Set up the prompt template and processing chain:
+
+```python
+# 3. Define the prompt template
+template = """
+You are a Technology Career Mentor and expert in youth employability.
+Your mission is to analyze this student's profile based ONLY on the following context (their CV):
+{context}
+
+Question: {question}
+"""
+prompt = ChatPromptTemplate.from_template(template)
+
+# 4. Create the processing chain
+chain = (
+    {"context": retriever, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+```
+
+## Executing a Query
+
+Now ask questions about the candidate's profile:
+
+```python
+# 5. Ask a question (focused on potential and skills, not years of experience)
+pregunta = "What outstanding projects or academic experience does this student have and what is their main technology stack?"
+respuesta = chain.invoke(pregunta)
+
+print(f"\n❓ MENTOR QUESTION: {pregunta}")
+print("-" * 50)
+print(f"🤖 PROFILE ANALYSIS:\n{respuesta}")
+```
+
+## Expected Output
+
+```
+📂 Selected student profile: 'CV_Estudiante_4_Fernanda_Paredes.pdf'
+⏳ Reading PDF and creating vectors...
+
+❓ MENTOR QUESTION: What outstanding projects or academic experience does this student have and what is their main technology stack?
+--------------------------------------------------
+🤖 PROFILE ANALYSIS:
+Based exclusively on the CV provided, this is the analysis of Fernanda Paredes' profile:
+
+---
+
+### 1. Outstanding Projects and Academic Experience
+
+Fernanda Paredes is a 9th semester Software Engineering student (UTP) seeking her first professional opportunity as a Data Analyst Trainee.
+
+**Her experience and projects focus on the academic realm and are as follows:**
+
+1. **Academic Project as Data Analyst Trainee (Jun 2025 - Feb 2026):** Although the CV does not detail specific project functions, the title indicates an orientation toward data analysis.
+2. **Outstanding Achievement (Hackathon):** The strongest point of her profile is having obtained **first place in a university Hackathon** for developing a recycling application. This achievement demonstrates ability to work under pressure, innovation, and practical application of software development knowledge.
+
+### 2. Main Technology Stack
+
+Fernanda's technology stack is mixed, reflecting her interest in both software development and data analysis:
+
+| Area | Mentioned Technologies |
+| :--- | :--- |
+| **Data Analysis / BI** | Python, PowerBI |
+| **Software Development** | Java, Spring Boot |
+
+**Mentor Conclusion:**
+
+Fernanda has a solid foundation in development tools (Java, Spring Boot) and has demonstrated proactivity in the data area (Python, PowerBI), which is coherent with her goal of being a Data Analyst Trainee. Having won a Hackathon is an indicator of high potential and execution capability.
+```
+
+## Key Takeaways
+
+- **Simple Setup**: Load any CV PDF and start querying immediately
+- **Semantic Search**: The retriever finds relevant information based on meaning, not just keywords
+- **Structured Analysis**: The LLM provides organized, professional insights
+- **Flexible Questions**: Ask about skills, projects, experience, or any aspect of the CV
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Batch Processing" icon="layer-group" href="/examples/batch-processing">
+    Process multiple CVs at scale
+  </Card>
+  <Card title="Visualization" icon="chart-line" href="/examples/visualization">
+    Create interactive dashboards
+  </Card>
+</CardGroup>

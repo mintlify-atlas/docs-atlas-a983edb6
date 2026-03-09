@@ -1,0 +1,429 @@
+---
+title: 'CV Generation'
+description: 'Generate synthetic student CVs with ReportLab for testing and demonstration'
+icon: 'file-pdf'
+---
+
+## Overview
+
+The CV generation module creates realistic student/intern CVs using Python's ReportLab library. This is the "Data Factory" that generates test data for the RAG system.
+
+## How It Works
+
+The CV generator uses:
+- **ReportLab** for PDF creation
+- **Random data pools** for realistic variation
+- **Date generation logic** for experience timelines
+- **Structured profile templates** for student candidates
+
+<Steps>
+  <Step title="Configure Generation Parameters">
+    Set the number of CVs to generate and output directory:
+    
+    ```python
+    CANTIDAD_A_GENERAR = 5
+    CARPETA_DESTINO = "cvs_estudiantes_final"
+    ```
+  </Step>
+  
+  <Step title="Define Data Pools">
+    The generator uses predefined pools of realistic data:
+    
+    ```python
+    nombres = ["Anghelo", "Camila", "Sebastian", "Valeria", "Mateo"]
+    apellidos = ["Mendoza", "Vargas", "Toscano", "Rios", "Silva"]
+    universidades = ["UTP", "UPC", "UNI", "San Marcos", "U. Lima"]
+    ```
+  </Step>
+  
+  <Step title="Generate CVs">
+    Run the generation script to create PDFs:
+    
+    ```python
+    for i in range(1, CANTIDAD_A_GENERAR + 1):
+        # Generate profile data
+        # Create PDF with ReportLab
+        # Save to destination folder
+    ```
+  </Step>
+</Steps>
+
+## Student Profile Structure
+
+Each generated CV contains:
+
+<CardGroup cols={2}>
+  <Card title="Personal Info" icon="user">
+    - Full name
+    - Email (university format)
+    - Phone number
+    - Location (Lima, Peru)
+  </Card>
+  
+  <Card title="Academic Details" icon="graduation-cap">
+    - University name
+    - Current semester/cycle (6th-9th)
+    - Career (Software Engineering)
+    - Academic status
+  </Card>
+  
+  <Card title="Experience" icon="briefcase">
+    - Internships (3-8 months)
+    - Academic projects
+    - Freelance work
+    - Volunteer tech work
+  </Card>
+  
+  <Card title="Skills" icon="code">
+    - Tech stack (Python, Java, React)
+    - Tools (Git, PowerBI, Figma)
+    - Soft skills
+    - Languages
+  </Card>
+</CardGroup>
+
+## Complete Generation Code
+
+<CodeGroup>
+```python Full Generator
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import simpleSplit
+import os, random, shutil
+import datetime
+
+# Configuration
+CANTIDAD_A_GENERAR = 5
+CARPETA_DESTINO = "cvs_estudiantes_final"
+
+if os.path.exists(CARPETA_DESTINO): 
+    shutil.rmtree(CARPETA_DESTINO)
+os.makedirs(CARPETA_DESTINO, exist_ok=True)
+
+# Data pools
+nombres = ["Anghelo", "Camila", "Sebastian", "Valeria", "Mateo", 
+           "Fernanda", "Nicolas", "Luciana", "Juan", "Ximena"]
+apellidos = ["Mendoza", "Vargas", "Toscano", "Rios", "Silva", 
+             "Cordova", "Paredes", "Salas", "Leon", "Aguilar"]
+
+# Companies with academic context
+lugares_experiencia = [
+    "Freelance", 
+    "Proyecto Académico (UTP)", 
+    "Startup Universitaria", 
+    "Voluntariado Tech", 
+    "Pequeña Empresa SAC", 
+    "Consultora Junior"
+]
+
+universidades = ["UTP", "UPC", "UNI", "San Marcos", "U. Lima", 
+                 "Senati", "Cibertec"]
+
+# Tech roles
+roles_tech = [
+    "Practicante Pre-Profesional", 
+    "Estudiante de Ing. Software", 
+    "Junior Python Developer", 
+    "Asistente de TI", 
+    "Data Analyst Trainee"
+]
+
+# Admin roles
+roles_admin = [
+    "Practicante Comercial", 
+    "Asistente Administrativo", 
+    "Trainee de Finanzas", 
+    "Apoyo en RRHH"
+]
+
+# Tech stack
+tech_stack = [
+    "Python", "Java", "Spring Boot", "React", 
+    "SQL (PostgreSQL)", "Git/GitHub", "PowerBI", 
+    "Excel Intermedio", "Figma", "C# (.NET)"
+]
+
+admin_stack = [
+    "Excel Avanzado", "PowerPoint", "Canva", "Trello", 
+    "Google Workspace", "SAP (Básico)", "Inglés Intermedio"
+]
+
+# Tech achievements
+logros_tech = [
+    "Desarrollo de un Sistema de Biblioteca Virtual con roles de usuario y manejo de stock.",
+    "Creación de una API RESTful para gestión financiera usando Python y FastAPI.",
+    "Primer puesto en Hackathon universitaria desarrollando una app de reciclaje.",
+    "Automatización de reportes en Excel usando scripts de Python y Pandas.",
+    "Implementación de base de datos relacional normalizada para un e-commerce ficticio."
+]
+
+# Admin achievements
+logros_admin = [
+    "Organización de evento estudiantil con asistencia de más de 200 personas.",
+    "Apoyo en la digitalización de documentos reduciendo el uso de papel en la oficina.",
+    "Gestión de caja chica y reportes semanales sin errores durante 6 meses.",
+    "Liderazgo de equipo en trabajo final de curso, obteniendo la calificación máxima."
+]
+
+def generar_fechas_laborales(anios_experiencia):
+    """Generate work experience dates (3-8 months duration)"""
+    historial = []
+    fecha_referencia = datetime.date(2026, 2, 1)
+    cantidad_experiencias = random.randint(1, 2)
+    fecha_cursor = fecha_referencia
+    
+    for _ in range(cantidad_experiencias):
+        duracion_meses = random.randint(3, 8)
+        fecha_inicio = fecha_cursor - datetime.timedelta(days=duracion_meses*30)
+        
+        fin_str = fecha_cursor.strftime("%b %Y")
+        inicio_str = fecha_inicio.strftime("%b %Y")
+        
+        historial.append({
+            "inicio": inicio_str,
+            "fin": fin_str,
+            "duracion": f"({duracion_meses} meses)"
+        })
+        
+        fecha_cursor = fecha_inicio - datetime.timedelta(days=random.randint(30, 90))
+    
+    return historial
+
+def dibujar_cv(c, datos):
+    """Draw CV content on PDF canvas"""
+    y = 800
+    margen_izq = 50
+    ancho_maximo = 500
+    
+    # 1. Header
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(margen_izq, y, datos['nombre'].upper())
+    y -= 20
+    c.setFont("Helvetica-Bold", 12)
+    c.setFillColorRGB(0.2, 0.4, 0.6)
+    c.drawString(margen_izq, y, datos['rol_actual'])
+    c.setFillColorRGB(0, 0, 0)
+    y -= 15
+    c.setFont("Helvetica", 10)
+    c.drawString(margen_izq, y, f"{datos['email']} | {datos['telefono']} | {datos['ubicacion']}")
+    y -= 30
+    
+    # 2. Profile
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margen_izq, y, "PERFIL DE ESTUDIANTE")
+    c.line(margen_izq, y-2, 550, y-2)
+    y -= 15
+    c.setFont("Helvetica", 10)
+    
+    resumen_texto = f"Estudiante de {datos['ciclo']} ciclo con interés en {datos['area']}. " \
+                    f"Manejo de herramientas como {datos['key_skill']} y capacidad de aprendizaje rápido. " \
+                    f"Busco mi primera oportunidad profesional para aplicar conocimientos en {datos['rol_actual']}."
+    
+    lineas_resumen = simpleSplit(resumen_texto, "Helvetica", 10, ancho_maximo)
+    for linea in lineas_resumen:
+        c.drawString(margen_izq, y, linea)
+        y -= 12
+    y -= 20
+    
+    # 3. Projects/Experience
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margen_izq, y, "PROYECTOS Y EXPERIENCIA")
+    c.line(margen_izq, y-2, 550, y-2)
+    y -= 20
+    
+    for empleo in datos['experiencia']:
+        if y < 100: 
+            c.showPage()
+            y = 800
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(margen_izq, y, f"{empleo['rol']} | {empleo['empresa']}")
+        c.setFont("Helvetica-Oblique", 9)
+        c.drawString(400, y, f"{empleo['fechas']['inicio']} - {empleo['fechas']['fin']}")
+        y -= 12
+        c.setFont("Helvetica", 9)
+        for logro in empleo['logros']:
+            texto_logro = f"• {logro}"
+            lineas_logro = simpleSplit(texto_logro, "Helvetica", 9, ancho_maximo)
+            for linea in lineas_logro:
+                c.drawString(margen_izq + 10, y, linea)
+                y -= 10
+        y -= 5
+        c.setFont("Helvetica-Oblique", 8)
+        c.setFillColorRGB(0.4, 0.4, 0.4)
+        c.drawString(margen_izq + 10, y, f"Tech: {empleo['stack']}")
+        c.setFillColorRGB(0, 0, 0)
+        y -= 20
+    
+    # 4. Education
+    if y < 100: 
+        c.showPage()
+        y = 800
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margen_izq, y, "FORMACIÓN ACADÉMICA")
+    c.line(margen_izq, y-2, 550, y-2)
+    y -= 15
+    c.setFont("Helvetica", 10)
+    c.drawString(margen_izq, y, f"{datos['universidad']} - Ingeniería de Software")
+    c.setFont("Helvetica-Oblique", 9)
+    c.drawString(400, y, "En curso")
+    
+    c.save()
+
+# Generation engine
+print(f"Generando {CANTIDAD_A_GENERAR} CVs de Estudiantes/Practicantes...")
+
+for i in range(1, CANTIDAD_A_GENERAR + 1):
+    es_tech = random.random() < 0.8  # 80% tech profiles
+    nombre = f"{random.choice(nombres)} {random.choice(apellidos)}"
+    ciclo = random.randint(6, 9)  # 6th to 9th semester
+    
+    if es_tech:
+        rol_base = random.choice(roles_tech)
+        skills_pool = tech_stack
+        logros_pool = logros_tech
+        area = "Desarrollo de Software y Datos"
+    else:
+        rol_base = random.choice(roles_admin)
+        skills_pool = admin_stack
+        logros_pool = logros_admin
+        area = "Gestión Administrativa"
+    
+    fechas_bloques = generar_fechas_laborales(ciclo)
+    experiencia_data = []
+    
+    for bloque in fechas_bloques:
+        experiencia_data.append({
+            "empresa": random.choice(lugares_experiencia),
+            "rol": rol_base,
+            "fechas": bloque,
+            "logros": random.sample(logros_pool, 1),
+            "stack": ", ".join(random.sample(skills_pool, 3))
+        })
+    
+    datos_candidato = {
+        "nombre": nombre,
+        "rol_actual": rol_base,
+        "email": f"{nombre.split()[0].lower()}.student@universidad.edu.pe",
+        "telefono": "+51 912 345 678",
+        "ubicacion": "Lima, Perú",
+        "ciclo": f"{ciclo}no",
+        "area": area,
+        "key_skill": skills_pool[0],
+        "universidad": random.choice(universidades),
+        "experiencia": experiencia_data
+    }
+    
+    nombre_archivo = f"CV_Estudiante_{i}_{nombre.replace(' ', '_')}.pdf"
+    c = canvas.Canvas(os.path.join(CARPETA_DESTINO, nombre_archivo), pagesize=A4)
+    dibujar_cv(c, datos_candidato)
+
+print(f"¡Listo! CVs de estudiantes creados en carpeta '{CARPETA_DESTINO}'.")
+```
+
+```python Minimal Example
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+
+# Create simple CV
+c = canvas.Canvas("example_cv.pdf", pagesize=A4)
+
+# Header
+c.setFont("Helvetica-Bold", 16)
+c.drawString(50, 800, "JUAN PEREZ")
+
+c.setFont("Helvetica", 10)
+c.drawString(50, 780, "juan.perez@universidad.edu.pe | +51 912 345 678")
+
+# Profile section
+c.setFont("Helvetica-Bold", 11)
+c.drawString(50, 750, "PERFIL")
+c.line(50, 748, 550, 748)
+
+c.setFont("Helvetica", 10)
+c.drawString(50, 730, "Estudiante de 7mo ciclo con experiencia en Python y React.")
+
+c.save()
+print("CV generated: example_cv.pdf")
+```
+</CodeGroup>
+
+## Customization Options
+
+<Tabs>
+  <Tab title="Profile Types">
+    Control the distribution of tech vs. admin profiles:
+    
+    ```python
+    # 80% tech, 20% admin
+    es_tech = random.random() < 0.8
+    ```
+    
+    Adjust the probability to change the mix.
+  </Tab>
+  
+  <Tab title="Experience Duration">
+    Modify the experience length range:
+    
+    ```python
+    def generar_fechas_laborales(anios_experiencia):
+        # 3 to 8 months by default
+        duracion_meses = random.randint(3, 8)
+        
+        # Change to 6-12 months:
+        # duracion_meses = random.randint(6, 12)
+    ```
+  </Tab>
+  
+  <Tab title="Academic Level">
+    Set the semester/cycle range:
+    
+    ```python
+    # 6th to 9th semester (default)
+    ciclo = random.randint(6, 9)
+    
+    # Final year students only:
+    # ciclo = random.randint(9, 10)
+    ```
+  </Tab>
+  
+  <Tab title="Skills Pool">
+    Add or modify available technologies:
+    
+    ```python
+    tech_stack = [
+        "Python", "Java", "Spring Boot", "React",
+        # Add new technologies:
+        "TypeScript", "Docker", "AWS", "MongoDB"
+    ]
+    ```
+  </Tab>
+</Tabs>
+
+## Output Structure
+
+The generator creates CVs with this file naming pattern:
+
+```
+cvs_estudiantes_final/
+├── CV_Estudiante_1_Anghelo_Mendoza.pdf
+├── CV_Estudiante_2_Camila_Vargas.pdf
+├── CV_Estudiante_3_Sebastian_Toscano.pdf
+├── CV_Estudiante_4_Valeria_Rios.pdf
+└── CV_Estudiante_5_Mateo_Silva.pdf
+```
+
+<Note>
+The generated CVs are designed to represent realistic student profiles with academic projects, short internships, and entry-level tech skills. They prioritize **potential** and **learning ability** over years of experience.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Profile Analysis" icon="magnifying-glass" href="/guides/profile-analysis">
+    Learn how to query individual CVs using RAG
+  </Card>
+  
+  <Card title="Talent Mining" icon="users" href="/guides/talent-mining">
+    Process multiple CVs in batch mode
+  </Card>
+</CardGroup>

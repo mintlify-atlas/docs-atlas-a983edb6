@@ -1,0 +1,310 @@
+---
+title: 'Visualization Example'
+description: 'Create interactive dashboards with Plotly to visualize talent data'
+icon: 'chart-line'
+---
+
+## Overview
+
+This example shows how to create interactive visualizations using Plotly to analyze and present talent data extracted from CVs. Build professional dashboards to understand your candidate pipeline.
+
+## Prerequisites
+
+Make sure you've completed the [batch processing](/examples/batch-processing) example to have a DataFrame with extracted talent data.
+
+## Setup
+
+Import the required libraries:
+
+```python
+import pandas as pd
+import plotly.express as px
+
+# Assume 'resultados' is available from batch processing
+df = pd.DataFrame(resultados)
+print(f"TOTAL STUDENTS ANALYZED: {len(df)}")
+```
+
+## Sunburst Chart: Talent Distribution
+
+Create a hierarchical view of talent by university and specialization:
+
+```python
+if not df.empty:
+    # CHART 1: Talent Map (University > Profile)
+    if 'universidad' in df.columns and 'tipo_perfil' in df.columns:
+        fig1 = px.sunburst(
+            df, 
+            path=['universidad', 'tipo_perfil'],
+            title="Youth Talent Distribution (University > Specialty)",
+            color='universidad',
+            color_discrete_sequence=px.colors.qualitative.Bold
+        )
+        fig1.show()
+else:
+    print("No data extracted. Make sure batch processing ran successfully.")
+```
+
+### Example Output
+
+The sunburst chart creates an interactive hierarchical visualization:
+
+- **Inner ring**: Universities (UTP, UNI, San Marcos)
+- **Outer ring**: Profile types (Data, Fullstack, Backend, Frontend)
+- **Interactive**: Click segments to drill down
+- **Color-coded**: Each university has a distinct color
+
+<img src="/images/sunburst-example.png" alt="Sunburst Chart Example" />
+
+## Bar Chart: Academic Level Ranking
+
+Visualize students by their academic progress and profile type:
+
+```python
+if 'ciclo_actual' in df.columns:
+    # Sort by current cycle
+    df_sorted = df.sort_values(by='ciclo_actual')
+
+    fig2 = px.bar(
+        df_sorted, 
+        x='nombre', 
+        y='ciclo_actual',
+        color='tipo_perfil',
+        title="Academic Ranking: Students by Cycle and Profile",
+        text='ciclo_actual',
+        labels={
+            'ciclo_actual': 'Academic Cycle', 
+            'nombre': 'Student'
+        }
+    )
+
+    fig2.update_traces(textposition='outside')
+    fig2.update_layout(xaxis_tickangle=-45)
+    fig2.show()
+```
+
+### Chart Features
+
+<CardGroup cols={2}>
+  <Card title="Color Coding" icon="palette">
+    Different colors for each profile type (Data, Fullstack, etc.)
+  </Card>
+  <Card title="Labels" icon="tag">
+    Cycle information displayed on each bar
+  </Card>
+  <Card title="Rotation" icon="rotate">
+    45-degree angle for readable student names
+  </Card>
+  <Card title="Interactive" icon="hand-pointer">
+    Hover to see detailed information
+  </Card>
+</CardGroup>
+
+## Display Results Table
+
+Show the structured data alongside visualizations:
+
+```python
+print("\n📊 INTERNSHIP DATABASE:")
+
+cols_a_mostrar = [
+    'nombre', 
+    'universidad', 
+    'ciclo_actual', 
+    'tipo_perfil', 
+    'stack_principal', 
+    'potencial_contratacion'
+]
+
+# Only show columns that exist
+cols_finales = [c for c in cols_a_mostrar if c in df.columns]
+
+# Display the DataFrame
+from IPython.display import display
+display(df[cols_finales])
+```
+
+## Complete Dashboard Example
+
+Here's a complete example combining multiple visualizations:
+
+```python
+import pandas as pd
+import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+
+# Load data
+df = pd.DataFrame(resultados)
+print(f"TOTAL STUDENTS ANALYZED: {len(df)}")
+
+if not df.empty:
+    # Create figure with subplots
+    from plotly.subplots import make_subplots
+    
+    # Chart 1: Sunburst - University distribution
+    if 'universidad' in df.columns and 'tipo_perfil' in df.columns:
+        fig1 = px.sunburst(
+            df, 
+            path=['universidad', 'tipo_perfil'],
+            title="Youth Talent Distribution (University > Specialty)",
+            color='universidad',
+            color_discrete_sequence=px.colors.qualitative.Bold
+        )
+        fig1.show()
+    
+    # Chart 2: Bar - Academic ranking
+    if 'ciclo_actual' in df.columns:
+        df_sorted = df.sort_values(by='ciclo_actual')
+        
+        fig2 = px.bar(
+            df_sorted, 
+            x='nombre', 
+            y='ciclo_actual',
+            color='tipo_perfil',
+            title="Academic Ranking: Students by Cycle and Profile",
+            text='ciclo_actual',
+            labels={'ciclo_actual': 'Academic Cycle', 'nombre': 'Student'}
+        )
+        
+        fig2.update_traces(textposition='outside')
+        fig2.update_layout(xaxis_tickangle=-45)
+        fig2.show()
+    
+    # Display final table
+    print("\n📊 INTERNSHIP DATABASE:")
+    cols_a_mostrar = [
+        'nombre', 'universidad', 'ciclo_actual', 
+        'tipo_perfil', 'stack_principal', 'potencial_contratacion'
+    ]
+    cols_finales = [c for c in cols_a_mostrar if c in df.columns]
+    display(df[cols_finales])
+else:
+    print("No data extracted. Ensure batch processing ran without errors.")
+```
+
+## Advanced Visualizations
+
+### Technology Skills Distribution
+
+Analyze the most common technologies across all candidates:
+
+```python
+# Extract and count all technologies
+from collections import Counter
+
+all_tech = []
+for stack in df['stack_principal']:
+    if isinstance(stack, list):
+        all_tech.extend(stack)
+
+tech_counts = Counter(all_tech)
+tech_df = pd.DataFrame(tech_counts.most_common(10), 
+                       columns=['Technology', 'Count'])
+
+fig3 = px.bar(
+    tech_df,
+    x='Technology',
+    y='Count',
+    title="Top 10 Technologies Across All Candidates",
+    color='Count',
+    color_continuous_scale='Viridis'
+)
+fig3.show()
+```
+
+### Profile Type Distribution
+
+Create a pie chart of profile types:
+
+```python
+profile_counts = df['tipo_perfil'].value_counts()
+
+fig4 = px.pie(
+    values=profile_counts.values,
+    names=profile_counts.index,
+    title="Distribution of Profile Types",
+    hole=0.3  # Creates a donut chart
+)
+fig4.show()
+```
+
+## Exporting Visualizations
+
+<Tabs>
+  <Tab title="HTML">
+    ```python
+    # Save as interactive HTML
+    fig1.write_html("talent_distribution.html")
+    print("Saved to talent_distribution.html")
+    ```
+  </Tab>
+  
+  <Tab title="PNG">
+    ```python
+    # Requires kaleido: pip install kaleido
+    fig1.write_image("talent_distribution.png", width=1200, height=800)
+    print("Saved to talent_distribution.png")
+    ```
+  </Tab>
+  
+  <Tab title="PDF">
+    ```python
+    # Requires kaleido
+    fig1.write_image("talent_distribution.pdf")
+    print("Saved to talent_distribution.pdf")
+    ```
+  </Tab>
+</Tabs>
+
+## Dashboard Best Practices
+
+<AccordionGroup>
+  <Accordion title="Color Consistency">
+    Use consistent color schemes across all charts for the same categories (e.g., same color for "Fullstack" in all visualizations)
+  </Accordion>
+  
+  <Accordion title="Interactive Elements">
+    Enable hover tooltips, zoom, and pan for better data exploration
+  </Accordion>
+  
+  <Accordion title="Clear Titles">
+    Use descriptive titles that explain what each chart shows
+  </Accordion>
+  
+  <Accordion title="Responsive Design">
+    Test charts at different screen sizes and adjust as needed
+  </Accordion>
+</AccordionGroup>
+
+## Real-World Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Recruitment Dashboard" icon="users">
+    Track candidate pipeline and identify skill gaps
+  </Card>
+  <Card title="University Relations" icon="building-columns">
+    Analyze talent sources and university partnerships
+  </Card>
+  <Card title="Skills Planning" icon="brain">
+    Identify trending technologies in your candidate pool
+  </Card>
+  <Card title="Diversity Metrics" icon="chart-pie">
+    Monitor diversity across specializations and institutions
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<Tip>
+Combine these visualizations with the RAG query system to create an interactive talent search dashboard!
+</Tip>
+
+<CardGroup cols={2}>
+  <Card title="Basic Query" icon="magnifying-glass" href="/examples/basic-query">
+    Query individual profiles
+  </Card>
+  <Card title="Batch Processing" icon="layer-group" href="/examples/batch-processing">
+    Extract data from multiple CVs
+  </Card>
+</CardGroup>

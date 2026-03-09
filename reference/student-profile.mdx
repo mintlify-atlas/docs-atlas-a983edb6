@@ -1,0 +1,279 @@
+---
+title: "PerfilEstudiante Model"
+description: "Pydantic data model for structured student profile extraction from CVs"
+---
+
+## Overview
+
+The `PerfilEstudiante` (Student Profile) model is a Pydantic BaseModel that defines the schema for extracting and validating structured data from student resumes. This model is designed specifically for student and early-career talent, emphasizing academic achievements, projects, and technical potential over traditional work experience.
+
+<Note>
+  This model is optimized for **student recruitment** scenarios where academic projects, hackathon achievements, and technical skills are more valuable indicators than years of experience.
+</Note>
+
+## Model Definition
+
+The model is defined in the notebook at `source/notebook/Talent_Scout_3000x.ipynb:902-919`.
+
+```python
+from pydantic import BaseModel, Field
+
+class PerfilEstudiante(BaseModel):
+    # Datos Personales
+    nombre: str = Field(description="Nombre completo del estudiante")
+    email: str = Field(description="Email universitario o personal")
+    ubicacion: str = Field(description="Ciudad/País")
+
+    # Perfil Académico
+    universidad: str = Field(description="Nombre de la universidad o instituto")
+    carrera: str = Field(description="Carrera que está estudiando (ej. Ing. Software)")
+    ciclo_actual: str = Field(description="Ciclo o semestre actual (ej. 7mo Ciclo, Egresado)")
+
+    # Talento Tech
+    stack_principal: list = Field(description="Lista de top 5 lenguajes/tecnologías que domina")
+    proyectos_destacados: list = Field(description="Nombres de proyectos académicos, tesis o freelance mencionados")
+
+    # Evaluación de Perfil
+    tipo_perfil: str = Field(description="Clasificar en: Backend, Frontend, Data, Fullstack o Gestión")
+    potencial_contratacion: str = Field(description="Breve justificación de por qué contratarlo como practicante")
+```
+
+## Field Reference
+
+### Personal Information
+
+<ParamField path="nombre" type="string" required>
+  Full name of the student as it appears on the CV.
+  
+  **Example:** `"Fernanda Paredes"`
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  University or personal email address. Typically includes university domain for students.
+  
+  **Example:** `"fernanda.student@universidad.edu.pe"`
+</ParamField>
+
+<ParamField path="ubicacion" type="string" required>
+  City and country location of the candidate.
+  
+  **Example:** `"Lima, Perú"`
+</ParamField>
+
+### Academic Profile
+
+<ParamField path="universidad" type="string" required>
+  Name of the university or technical institute where the student is enrolled.
+  
+  **Valid values:** `"UTP"`, `"UPC"`, `"UNI"`, `"San Marcos"`, `"U. Lima"`, `"Senati"`, `"Cibertec"`
+  
+  **Example:** `"UTP"`
+</ParamField>
+
+<ParamField path="carrera" type="string" required>
+  Academic major or degree program the student is pursuing.
+  
+  **Example:** `"Ingeniería de Software"`, `"Ciencias de la Computación"`
+</ParamField>
+
+<ParamField path="ciclo_actual" type="string" required>
+  Current semester or cycle in the degree program. Can also indicate "Egresado" (graduated) status.
+  
+  **Format:** `"7mo Ciclo"`, `"VI Ciclo"`, `"Egresado"`
+  
+  **Example:** `"9no Ciclo"`
+</ParamField>
+
+### Technical Talent
+
+<ParamField path="stack_principal" type="list[string]" required>
+  List of top 5 programming languages, frameworks, or technologies the student has proficiency in. Extracted from projects and experience sections.
+  
+  **Example:**
+  ```python
+  ["Python", "PowerBI", "Java", "Spring Boot", "React"]
+  ```
+</ParamField>
+
+<ParamField path="proyectos_destacados" type="list[string]" required>
+  Names of notable academic projects, thesis work, freelance projects, or hackathon achievements. Focus on **what was built**, not company names.
+  
+  **Example:**
+  ```python
+  [
+    "Sistema de Biblioteca Virtual con roles de usuario",
+    "Primer puesto en Hackathon desarrollando app de reciclaje",
+    "API RESTful para gestión financiera usando FastAPI"
+  ]
+  ```
+</ParamField>
+
+### Profile Evaluation
+
+<ParamField path="tipo_perfil" type="string" required>
+  Classification of the student's technical specialization based on their skill stack.
+  
+  **Valid values:**
+  - `"Backend"` — Java + Spring, Python APIs, database focus
+  - `"Frontend"` — React, Vue, Angular, UI/UX tools
+  - `"Data"` — Python + Pandas, PowerBI, SQL analytics
+  - `"Fullstack"` — Both frontend and backend technologies
+  - `"Gestión"` — Administrative, business, or non-technical roles
+  
+  **Classification logic:**
+  - Python + Pandas/PowerBI → `"Data"`
+  - React + Node.js → `"Fullstack"`
+  - Java + Spring Boot → `"Backend"`
+  
+  **Example:** `"Data"`
+</ParamField>
+
+<ParamField path="potencial_contratacion" type="string" required>
+  A brief justification (1-2 sentences) explaining why this student is a strong candidate for an internship or junior role. Should highlight **potential** over experience.
+  
+  **Example:**
+  ```
+  "Fernanda es una candidata fuerte para Data Analyst Trainee. 
+  Su victoria en Hackathon demuestra capacidad de ejecución bajo presión, 
+  y su stack (Python, PowerBI) es coherente con análisis de datos."
+  ```
+</ParamField>
+
+## Validation Rules
+
+<Warning>
+  All fields are **required** and will raise validation errors if missing or invalid.
+</Warning>
+
+- **String fields** cannot be empty
+- **List fields** must contain at least one element
+- **tipo_perfil** should match one of the five predefined categories
+- **ciclo_actual** should follow Spanish ordinal format (e.g., "7mo Ciclo")
+
+## Usage Example
+
+### Basic Instantiation
+
+```python
+from pydantic import BaseModel, Field
+
+# Create a student profile instance
+perfil = PerfilEstudiante(
+    nombre="Fernanda Paredes",
+    email="fernanda.student@utp.edu.pe",
+    ubicacion="Lima, Perú",
+    universidad="UTP",
+    carrera="Ingeniería de Software",
+    ciclo_actual="9no Ciclo",
+    stack_principal=["Python", "PowerBI", "Java", "Spring Boot"],
+    proyectos_destacados=[
+        "Primer puesto en Hackathon universitaria - App de Reciclaje",
+        "Sistema de análisis de datos con Python y Pandas"
+    ],
+    tipo_perfil="Data",
+    potencial_contratacion="Estudiante avanzado con experiencia práctica en análisis de datos y victoria en Hackathon."
+)
+
+print(perfil.nombre)  # "Fernanda Paredes"
+print(perfil.tipo_perfil)  # "Data"
+```
+
+### With JSON Output Parser
+
+The model is typically used with LangChain's `JsonOutputParser` for structured extraction from CV text:
+
+```python
+from langchain_core.output_parsers import JsonOutputParser
+
+parser = JsonOutputParser(pydantic_object=PerfilEstudiante)
+
+# Use in a LangChain chain
+chain_extract = prompt_extract | llm | parser
+
+data = chain_extract.invoke({
+    "context": cv_text,
+    "format_instructions": parser.get_format_instructions()
+})
+
+# data is now a dict matching PerfilEstudiante schema
+print(data['nombre'])  # Extracted name
+print(data['stack_principal'])  # Extracted tech stack
+```
+
+### Batch Processing
+
+Process multiple CVs and convert to DataFrame:
+
+```python
+import pandas as pd
+import glob
+from langchain_community.document_loaders import PyPDFLoader
+
+resultados = []
+archivos = glob.glob("cvs_estudiantes_final/*.pdf")
+
+for pdf in archivos:
+    loader = PyPDFLoader(pdf)
+    pages = loader.load()
+    texto_completo = "\n".join([p.page_content for p in pages])
+    
+    # Extract structured data
+    data = chain_extract.invoke({
+        "context": texto_completo,
+        "format_instructions": parser.get_format_instructions()
+    })
+    
+    resultados.append(data)
+
+# Convert to DataFrame for analysis
+df_talent = pd.DataFrame(resultados)
+print(df_talent[['nombre', 'universidad', 'tipo_perfil', 'stack_principal']])
+```
+
+## Real-World Example
+
+Here's an actual extracted profile from the notebook execution:
+
+```json
+{
+  "nombre": "FERNANDA PAREDES",
+  "email": "fernanda.student@universidad.edu.pe",
+  "ubicacion": "Lima, Perú",
+  "universidad": "UTP",
+  "carrera": "Ingeniería de Software",
+  "ciclo_actual": "9no Ciclo",
+  "stack_principal": ["Python", "PowerBI", "Java", "Spring Boot"],
+  "proyectos_destacados": [
+    "Primer puesto en Hackathon universitaria desarrollando app de reciclaje"
+  ],
+  "tipo_perfil": "Data",
+  "potencial_contratacion": "Fernanda es una candidata fuerte para Data Analyst Trainee. Su victoria en Hackathon demuestra capacidad de ejecución bajo presión, y su stack (Python, PowerBI) es coherente con análisis de datos."
+}
+```
+
+## Related Models
+
+<CardGroup cols={2}>
+  <Card title="Extraction Schema" icon="code" href="/reference/extraction-schema">
+    Learn how to configure the JsonOutputParser for CV extraction
+  </Card>
+  <Card title="Talent Mining Guide" icon="pickaxe" href="/guides/talent-mining">
+    Step-by-step guide for batch CV processing
+  </Card>
+</CardGroup>
+
+## Design Philosophy
+
+<AccordionGroup>
+  <Accordion title="Why emphasize projects over experience?">
+    For student recruitment, academic projects and hackathon achievements are stronger indicators of technical capability and learning agility than months of work experience. A student who won first place in a university hackathon demonstrates problem-solving, teamwork, and execution skills.
+  </Accordion>
+  
+  <Accordion title="Why include potencial_contratacion?">
+    This field forces the LLM to synthesize its understanding of the candidate into a hiring justification, providing explainability for recruitment decisions. It goes beyond data extraction to reasoning.
+  </Accordion>
+  
+  <Accordion title="Why use Spanish field names?">
+    The original project targets Latin American university students (Peru), so Spanish field names maintain cultural context and reduce translation errors in CV parsing.
+  </Accordion>
+</AccordionGroup>

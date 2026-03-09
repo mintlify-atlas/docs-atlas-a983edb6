@@ -1,0 +1,457 @@
+---
+title: 'Vector Store API'
+description: 'FAISS vector database for semantic search across resumes'
+icon: 'database'
+---
+
+## Overview
+
+**FAISS (Facebook AI Similarity Search)** is used to store resume embeddings and perform fast similarity searches. The RAG Recruitment Assistant uses FAISS to find the most relevant candidates based on semantic matching.
+
+## Installation
+
+```bash
+pip install faiss-cpu  # CPU version
+# OR
+pip install faiss-gpu  # GPU version (requires CUDA)
+```
+
+## Creating a Vector Store
+
+### from_documents()
+
+The primary method for creating a FAISS index from documents.
+
+<ParamField path="documents" type="list[Document]" required>
+  List of LangChain Document objects to index.
+</ParamField>
+
+<ParamField path="embedding" type="Embeddings" required>
+  Embeddings model to use for vectorization.
+</ParamField>
+
+<ResponseField name="vectorstore" type="FAISS">
+  FAISS vector store instance ready for querying.
+</ResponseField>
+
+<CodeGroup>
+```python Basic Usage
+from langchain_community.vectorstores import FAISS
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# Initialize embeddings
+embeddings = HuggingFaceEmbeddings()
+
+# Load resume
+loader = PyPDFLoader("resume.pdf")
+docs = loader.load()
+
+# Create vector store
+vectorstore = FAISS.from_documents(docs, embeddings)
+```
+
+```python From Notebook
+# Real implementation from Talent_Scout_3000x.ipynb
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+
+ruta_archivo = "cvs_estudiantes_final/CV_Estudiante_4_Fernanda_Paredes.pdf"
+
+# Load and vectorize
+loader = PyPDFLoader(ruta_archivo)
+docs = loader.load()
+vectorstore = FAISS.from_documents(docs, embeddings)
+```
+</CodeGroup>
+
+## Retriever Configuration
+
+### as_retriever()
+
+Convert the vector store into a retriever for use in RAG chains.
+
+<ParamField path="search_type" type="string" default="similarity">
+  Type of search to perform.
+  
+  **Options:**
+  - `similarity` - Basic cosine similarity (default)
+  - `mmr` - Maximum Marginal Relevance (diverse results)
+  - `similarity_score_threshold` - Only return results above threshold
+</ParamField>
+
+<ParamField path="search_kwargs" type="dict" default="{}">
+  Additional search parameters.
+  
+  **Common kwargs:**
+  - `k` (int): Number of documents to return (default: 4)
+  - `score_threshold` (float): Minimum similarity score (for similarity_score_threshold)
+  - `fetch_k` (int): Number of documents to fetch for MMR
+  - `lambda_mult` (float): Diversity parameter for MMR (0-1)
+</ParamField>
+
+```python
+# Basic retriever (default settings)
+retriever = vectorstore.as_retriever()
+
+# Custom retriever with more results
+retriever = vectorstore.as_retriever(
+    search_kwargs={"k": 6}
+)
+
+# MMR retriever for diverse results
+retriever = vectorstore.as_retriever(
+    search_type="mmr",
+    search_kwargs={
+        "k": 5,
+        "fetch_k": 20,
+        "lambda_mult": 0.5
+    }
+)
+
+# Score threshold retriever
+retriever = vectorstore.as_retriever(
+    search_type="similarity_score_threshold",
+    search_kwargs={"score_threshold": 0.7}
+)
+```
+
+## Search Methods
+
+### similarity_search()
+
+Find the most similar documents to a query.
+
+<ParamField path="query" type="str" required>
+  Search query text.
+</ParamField>
+
+<ParamField path="k" type="int" default="4">
+  Number of results to return.
+</ParamField>
+
+<ResponseField name="documents" type="list[Document]">
+  List of most similar documents.
+</ResponseField>
+
+```python
+query = "Desarrollador Python con experiencia en FastAPI"
+results = vectorstore.similarity_search(query, k=3)
+
+for i, doc in enumerate(results, 1):
+    print(f"\nResult {i}:")
+    print(doc.page_content[:200])  # First 200 chars
+```
+
+### similarity_search_with_score()
+
+Search with similarity scores included.
+
+```python
+query = "Data Analyst con PowerBI"
+results_with_scores = vectorstore.similarity_search_with_score(query, k=3)
+
+for doc, score in results_with_scores:
+    print(f"Score: {score:.4f}")
+    print(f"Content: {doc.page_content[:150]}...\n")
+```
+
+### max_marginal_relevance_search()
+
+Retrieve diverse results using MMR algorithm.
+
+<ParamField path="query" type="str" required>
+  Search query.
+</ParamField>
+
+<ParamField path="k" type="int" default="4">
+  Number of documents to return.
+</ParamField>
+
+<ParamField path="fetch_k" type="int" default="20">
+  Number of candidates to consider.
+</ParamField>
+
+<ParamField path="lambda_mult" type="float" default="0.5">
+  Diversity vs relevance trade-off (0=max diversity, 1=max relevance).
+</ParamField>
+
+```python
+query = "Estudiante de ingeniería con proyectos en React"
+diverse_results = vectorstore.max_marginal_relevance_search(
+    query=query,
+    k=5,
+    fetch_k=20,
+    lambda_mult=0.7  # Favor relevance over diversity
+)
+```
+
+## Real-World Implementation
+
+### Single Resume Query System
+
+From the Talent Scout notebook - interrogating individual resumes:
+
+```python reference/notebook/Talent_Scout_3000x.ipynb
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+
+# Load resume PDF
+ruta_archivo = "cvs_estudiantes_final/CV_Estudiante_4_Fernanda_Paredes.pdf"
+loader = PyPDFLoader(ruta_archivo)
+docs = loader.load()
+
+# Create vector store
+vectorstore = FAISS.from_documents(docs, embeddings)
+retriever = vectorstore.as_retriever()
+
+# Create RAG chain
+template = """
+Eres un Mentor de Carrera Tecnológica y experto en empleabilidad joven.
+Tu misión es analizar el perfil de este estudiante basándote SOLO en el siguiente contexto (su CV):
+{context}
+
+Pregunta: {question}
+"""
+prompt = ChatPromptTemplate.from_template(template)
+
+chain = (
+    {"context": retriever, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+# Query the resume
+pregunta = "¿Qué proyectos destacados tiene este estudiante?"
+respuesta = chain.invoke(pregunta)
+print(respuesta)
+```
+
+### Multi-Resume Search System
+
+```python
+import glob
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+# Load all resumes
+all_docs = []
+archivos = glob.glob("cvs_estudiantes_final/*.pdf")
+
+for pdf_path in archivos:
+    loader = PyPDFLoader(pdf_path)
+    docs = loader.load()
+    
+    # Add metadata
+    for doc in docs:
+        doc.metadata["source_file"] = pdf_path
+    
+    all_docs.extend(docs)
+
+print(f"Loaded {len(all_docs)} pages from {len(archivos)} resumes")
+
+# Create unified vector store
+vectorstore = FAISS.from_documents(all_docs, embeddings)
+
+# Search across all resumes
+query = "Estudiante con experiencia en Hackathon"
+results = vectorstore.similarity_search(query, k=5)
+
+for doc in results:
+    print(f"Source: {doc.metadata['source_file']}")
+    print(f"Content: {doc.page_content[:200]}...\n")
+```
+
+## Persistence
+
+### Save Vector Store
+
+```python
+# Save to disk
+vectorstore.save_local("faiss_index")
+print("Vector store saved successfully")
+```
+
+### Load Vector Store
+
+```python
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# Must use same embeddings model
+embeddings = HuggingFaceEmbeddings()
+
+# Load from disk
+vectorstore = FAISS.load_local(
+    "faiss_index",
+    embeddings,
+    allow_dangerous_deserialization=True
+)
+
+print("Vector store loaded successfully")
+```
+
+## Adding Documents
+
+### add_documents()
+
+Add new documents to an existing vector store.
+
+```python
+# Create initial vector store
+vectorstore = FAISS.from_documents(initial_docs, embeddings)
+
+# Add more documents later
+new_loader = PyPDFLoader("new_resume.pdf")
+new_docs = new_loader.load()
+
+vectorstore.add_documents(new_docs)
+print(f"Added {len(new_docs)} new documents")
+```
+
+### add_texts()
+
+Add raw text directly.
+
+```python
+texts = [
+    "Juan Pérez - Python Developer con 2 años en Django",
+    "María García - Data Scientist especializada en ML"
+]
+
+metadatas = [
+    {"name": "Juan Pérez", "role": "Developer"},
+    {"name": "María García", "role": "Data Scientist"}
+]
+
+vectorstore.add_texts(texts, metadatas=metadatas)
+```
+
+## Merging Vector Stores
+
+```python
+# Create two separate vector stores
+vectorstore1 = FAISS.from_documents(docs1, embeddings)
+vectorstore2 = FAISS.from_documents(docs2, embeddings)
+
+# Merge them
+vectorstore1.merge_from(vectorstore2)
+print("Vector stores merged successfully")
+```
+
+## Performance Optimization
+
+<AccordionGroup>
+  <Accordion title="Index Types" icon="gear">
+    FAISS supports multiple index types:
+    
+    ```python
+    # Default: IndexFlatL2 (exact search, slower for large datasets)
+    vectorstore = FAISS.from_documents(docs, embeddings)
+    
+    # For large datasets, use approximate search
+    import faiss
+    
+    # Create custom index
+    dimension = 384  # MiniLM dimension
+    index = faiss.IndexIVFFlat(
+        faiss.IndexFlatL2(dimension),
+        dimension,
+        100  # number of clusters
+    )
+    
+    vectorstore = FAISS(
+        embedding_function=embeddings.embed_query,
+        index=index,
+        docstore=InMemoryDocstore({}),
+        index_to_docstore_id={}
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Batch Processing" icon="layer-group">
+    ```python
+    # Process large resume collections in batches
+    batch_size = 10
+    archivos = glob.glob("cvs_estudiantes_final/*.pdf")
+    
+    vectorstore = None
+    
+    for i in range(0, len(archivos), batch_size):
+        batch_files = archivos[i:i + batch_size]
+        batch_docs = []
+        
+        for pdf in batch_files:
+            loader = PyPDFLoader(pdf)
+            batch_docs.extend(loader.load())
+        
+        if vectorstore is None:
+            vectorstore = FAISS.from_documents(batch_docs, embeddings)
+        else:
+            vectorstore.add_documents(batch_docs)
+        
+        print(f"Processed batch {i//batch_size + 1}")
+    ```
+  </Accordion>
+  
+  <Accordion title="Memory Management" icon="memory">
+    ```python
+    # Clear vector store from memory when done
+    del vectorstore
+    import gc
+    gc.collect()
+    
+    # Use save_local for large datasets
+    vectorstore.save_local("./index")
+    del vectorstore
+    
+    # Load only when needed
+    vectorstore = FAISS.load_local("./index", embeddings)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<Warning>
+  **Common Error: Dimension Mismatch**
+  
+  ```python
+  # Error: RuntimeError: Error in void faiss::IndexFlat::add_core
+  
+  # Fix: Ensure embeddings model is consistent
+  embeddings = HuggingFaceEmbeddings(
+      model_name="sentence-transformers/all-MiniLM-L6-v2"
+  )
+  
+  # When loading, use the SAME model
+  vectorstore = FAISS.load_local("index", embeddings)
+  ```
+</Warning>
+
+<Warning>
+  **Serialization Error**
+  
+  ```python
+  # Must allow deserialization when loading
+  vectorstore = FAISS.load_local(
+      "faiss_index",
+      embeddings,
+      allow_dangerous_deserialization=True
+  )
+  ```
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Embeddings" icon="vector-square" href="/reference/embeddings">
+    Learn about the embedding models
+  </Card>
+  <Card title="LLM Integration" icon="brain" href="/reference/llm-integration">
+    Build RAG chains with retrieved context
+  </Card>
+</CardGroup>

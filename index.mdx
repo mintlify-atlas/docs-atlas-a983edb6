@@ -1,97 +1,103 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "RAG Recruitment Assistant"
+description: "AI-powered talent matching using RAG architecture, semantic search, and LLM reasoning"
 ---
 
-## Setting up
+<Note>
+  This project demonstrates a **reverse matching** approach to recruitment — prioritizing technical potential and academic projects over years of experience.
+</Note>
 
-Get your documentation site up and running in minutes.
+## What is RAG Recruitment Assistant?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+The RAG Recruitment Assistant is an intelligent system that uses **Retrieval-Augmented Generation (RAG)** architecture to match candidates with opportunities based on semantic understanding rather than keyword filtering. Built with LangChain, FAISS, and Gemini 1.5 Flash, it analyzes student profiles to identify talent potential.
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get started in 5 minutes with Google Colab
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Installation" icon="download" href="/installation">
+    Set up the environment locally
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="RAG Architecture" icon="brain" href="/concepts/rag-architecture">
+    Understand the core architecture
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Examples" icon="code" href="/examples/basic-query">
+    See real-world usage examples
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Key Features
 
-Everything you need to create world-class documentation.
+<CardGroup cols={3}>
+  <Card title="Semantic Search" icon="magnifying-glass">
+    FAISS vector store enables similarity-based candidate discovery beyond keyword matching
+  </Card>
+  <Card title="LLM Reasoning" icon="wand-magic-sparkles">
+    Gemini 1.5 Flash generates intelligent justifications for candidate recommendations
+  </Card>
+  <Card title="Structured Extraction" icon="table">
+    Pydantic models extract profile data with validated schemas
+  </Card>
+  <Card title="Reverse Matching" icon="arrows-rotate">
+    Prioritize projects and potential over years of experience
+  </Card>
+  <Card title="Batch Processing" icon="layer-group">
+    Analyze multiple CVs simultaneously with parallel processing
+  </Card>
+  <Card title="Visualization" icon="chart-line">
+    Interactive dashboards with Plotly for talent insights
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Technology Stack
 
-## Need inspiration?
+This project leverages cutting-edge AI and ML technologies:
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
+- **LangChain** — Framework for LLM application development
+- **FAISS** — Facebook's vector similarity search library
+- **Gemini 1.5 Flash** — Google's fast, efficient LLM
+- **HuggingFace Embeddings** — Sentence transformers for semantic encoding
+- **Pydantic** — Data validation and structured extraction
+- **Plotly** — Interactive visualizations
+
+## Use Cases
+
+<Accordion title="Student Recruitment & Internship Matching">
+  Identify promising student candidates based on academic projects, hackathon wins, and technical skills rather than work history.
+</Accordion>
+
+<Accordion title="Talent Pool Analysis">
+  Build searchable talent databases that surface candidates based on semantic similarity to job requirements.
+</Accordion>
+
+<Accordion title="CV Screening Automation">
+  Automate the first-pass screening of resumes with LLM-powered analysis and structured data extraction.
+</Accordion>
+
+<Accordion title="Skills Gap Analysis">
+  Understand the skills distribution across candidate pools to inform training and hiring strategies.
+</Accordion>
+
+## Getting Started
+
+<Steps>
+  <Step title="Install Dependencies">
+    Set up Python 3.10+ and install required packages
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+  <Step title="Configure API Key">
+    Set your Google API key for Gemini access
+    ```bash
+    export GOOGLE_API_KEY="your_api_key"
+    ```
+  </Step>
+  <Step title="Run the Notebook">
+    Open `Talent_Scout_3000x.ipynb` in Google Colab or Jupyter and execute the cells
+  </Step>
+</Steps>
+
+<Card title="Need Help?" icon="circle-question" href="/guides/configuration">
+  Check out our configuration guide for detailed setup instructions
 </Card>

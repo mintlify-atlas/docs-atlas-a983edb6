@@ -1,80 +1,384 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get the RAG Recruitment Assistant running in minutes using Google Colab
 ---
 
-## Get started in three steps
+## Run in Google Colab (Recommended)
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+The fastest way to experience the RAG Recruitment Assistant is through Google Colab. You'll go from zero to analyzing candidate profiles in under 5 minutes.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  **No local installation required!** Google Colab provides a free Python environment with GPU support and all major ML libraries pre-installed.
 </Note>
+
+### Prerequisites
+
+<Steps>
+  <Step title="Google Account">
+    You'll need a Google account to access Google Colab
+  </Step>
+  
+  <Step title="Google API Key">
+    Get a free API key from [Google AI Studio](https://makersuite.google.com/app/apikey) to use Gemini 1.5 Flash
+  </Step>
+</Steps>
+
+### Step 1: Set Up API Key
+
+Before running the notebook, configure your Google API key as a Colab secret:
+
+<Steps>
+  <Step title="Open Colab Secrets">
+    In Google Colab, click the key icon 🔑 in the left sidebar
+  </Step>
+  
+  <Step title="Add Secret">
+    Click "Add new secret" and name it `GOOGLE_API_KEY`
+  </Step>
+  
+  <Step title="Paste Your Key">
+    Paste your API key from Google AI Studio and toggle "Notebook access"
+  </Step>
+</Steps>
+
+<Warning>
+  Never commit API keys to version control or share them publicly. Using Colab secrets keeps your credentials secure.
+</Warning>
+
+### Step 2: Initialize the System
+
+Run this cell to install dependencies and configure the LLM:
+
+```python
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# Verify API Key
+if not os.getenv("GOOGLE_API_KEY"):
+    raise ValueError("You must configure the GOOGLE_API_KEY environment variable")
+
+# Initialize Gemini 1.5 Flash
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0  # Deterministic outputs for consistent results
+)
+
+# Load HuggingFace Embeddings
+embeddings = HuggingFaceEmbeddings()
+
+print("LLM configured successfully.")
+```
+
+<Info>
+  **Expected Output:** You'll see progress bars as the sentence-transformer model downloads (~90MB). This happens once per session.
+</Info>
+
+### Step 3: Generate Sample Candidate Profiles
+
+The notebook includes a realistic data generator that creates student CVs in PDF format:
+
+```python
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+import os, random, shutil
+
+# Configuration
+CANTIDAD_A_GENERAR = 5
+CARPETA_DESTINO = "cvs_estudiantes_final"
+
+if os.path.exists(CARPETA_DESTINO): 
+    shutil.rmtree(CARPETA_DESTINO)
+os.makedirs(CARPETA_DESTINO, exist_ok=True)
+
+print(f"Generating {CANTIDAD_A_GENERAR} student CVs...")
+
+# Sample data pools
+nombres = ["Anghelo", "Camila", "Sebastian", "Valeria", "Mateo"]
+apellidos = ["Mendoza", "Vargas", "Toscano", "Rios", "Silva"]
+
+tech_stack = [
+    "Python", "Java", "Spring Boot", "React", 
+    "SQL (PostgreSQL)", "Git/GitHub", "PowerBI"
+]
+
+logros_tech = [
+    "Development of a Virtual Library System with user roles and stock management.",
+    "Created a RESTful API for financial management using Python and FastAPI.",
+    "First place in university Hackathon developing a recycling app.",
+    "Automation of Excel reports using Python scripts and Pandas.",
+    "Implementation of normalized relational database for a fictional e-commerce."
+]
+
+# Generate PDFs (full implementation in source code)
+# ...
+
+print(f"✓ {CANTIDAD_A_GENERAR} student CVs created in '{CARPETA_DESTINO}' folder")
+```
+
+**Expected Output:**
+```
+Generating 5 student CVs...
+✓ 5 student CVs created in 'cvs_estudiantes_final' folder
+```
+
+### Step 4: Query a Single Resume
+
+Let's analyze one candidate profile using RAG:
+
+```python
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+import random
+
+# Select a random CV
+carpeta_fuente = "cvs_estudiantes_final"
+archivos_disponibles = os.listdir(carpeta_fuente)
+archivo_elegido = random.choice(archivos_disponibles)
+ruta_archivo = f"{carpeta_fuente}/{archivo_elegido}"
+
+print(f"📂 Selected student profile: '{archivo_elegido}'")
+
+# Load and vectorize
+loader = PyPDFLoader(ruta_archivo)
+docs = loader.load()
+vectorstore = FAISS.from_documents(docs, embeddings)
+retriever = vectorstore.as_retriever()
+
+# Create RAG chain
+template = """
+You are a Career Mentor and expert in tech employability.
+Analyze this student's profile based ONLY on the following context (their CV):
+{context}
+
+Question: {question}
+"""
+prompt = ChatPromptTemplate.from_template(template)
+
+chain = (
+    {"context": retriever, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+# Ask about the candidate
+question = "What notable projects or academic experience does this student have, and what is their main tech stack?"
+response = chain.invoke(question)
+
+print(f"\n🔍 QUESTION: {question}")
+print("-" * 50)
+print(f"🤖 ANALYSIS:\n{response}")
+```
+
+<CodeGroup>
+```python Sample Output
+🔍 QUESTION: What notable projects or academic experience does this student have?
+--------------------------------------------------
+🤖 ANALYSIS:
+
+Based on the CV provided, this is the analysis for Fernanda Paredes:
+
+### Notable Projects and Academic Experience
+
+Fernanda Paredes is a 9th semester Software Engineering student (UTP) 
+seeking her first professional opportunity as a Data Analyst Trainee.
+
+**Key Projects:**
+1. **Academic Project as Data Analyst Trainee (Jun 2025 - Feb 2026)**
+2. **Hackathon Winner**: First place in university Hackathon for 
+   developing a recycling application
+
+### Main Tech Stack
+
+Fernanda's tech stack is mixed, reflecting her interest in both 
+software development and data analysis:
+
+| Area | Technologies |
+|------|-------------|
+| Data Analysis / BI | Python, PowerBI |
+| Software Development | Java, Spring Boot |
+
+**Conclusion:** Fernanda has a solid foundation in development tools 
+and demonstrated initiative in data (Python, PowerBI), which aligns 
+with her goal of becoming a Data Analyst Trainee. Winning a Hackathon 
+indicates high potential and execution capability.
+```
+</CodeGroup>
+
+### Step 5: Batch Analysis with Structured Data
+
+Now let's analyze ALL candidates at once and extract structured data:
+
+```python
+import glob
+import pandas as pd
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
+
+class StudentProfile(BaseModel):
+    nombre: str = Field(description="Full name of the student")
+    universidad: str = Field(description="Name of university or institute")
+    ciclo_actual: str = Field(description="Current semester (e.g., 7th Semester)")
+    stack_principal: list = Field(description="Top 5 technologies they know")
+    tipo_perfil: str = Field(description="Classify as: Backend, Frontend, Data, Fullstack, or Management")
+    potencial_contratacion: str = Field(description="Brief justification for hiring them as an intern")
+
+parser = JsonOutputParser(pydantic_object=StudentProfile)
+
+template_extract = """
+You are an Expert in Youth Employability and IT Recruitment.
+Analyze this student's CV and extract structured data.
+
+USE THIS JSON FORMAT:
+{format_instructions}
+
+CV TEXT:
+{context}
+"""
+
+prompt_extract = ChatPromptTemplate.from_template(template_extract)
+chain_extract = prompt_extract | llm | parser
+
+# Process all CVs
+resultados = []
+archivos = glob.glob("cvs_estudiantes_final/*.pdf")
+
+for pdf in archivos:
+    loader = PyPDFLoader(pdf)
+    pages = loader.load()
+    texto_completo = "\n".join([p.page_content for p in pages])
+    
+    data = chain_extract.invoke({
+        "context": texto_completo,
+        "format_instructions": parser.get_format_instructions()
+    })
+    
+    resultados.append(data)
+    print(f"✓ Processed: {data['nombre']} ({data['ciclo_actual']}) -> {data['tipo_perfil']}")
+
+# Create DataFrame
+df = pd.DataFrame(resultados)
+display(df[['nombre', 'universidad', 'tipo_perfil', 'potencial_contratacion']])
+```
+
+**Expected Output:**
+```
+✓ Processed: FERNANDA PAREDES (9no Ciclo) -> Data
+✓ Processed: XIMENA RIOS (9no ciclo) -> Fullstack
+✓ Processed: NICOLAS PAREDES (7mo Ciclo) -> Fullstack
+✓ Processed: LUCIANA CORDOVA (8vo ciclo) -> Fullstack
+✓ Processed: FERNANDA MENDOZA (8vo Ciclo) -> Fullstack
+```
+
+### Step 6: Advanced RAG Search
+
+Finally, let's perform a semantic search across all candidates:
+
+```python
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# Load all CVs
+docs_totales = []
+for pdf in archivos:
+    loader = PyPDFLoader(pdf)
+    documentos = loader.load()
+    for doc in documentos:
+        doc.metadata["source"] = pdf.split("/")[-1]
+    docs_totales.extend(documentos)
+
+# Split into chunks
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=600,
+    chunk_overlap=100
+)
+splits = text_splitter.split_documents(docs_totales)
+
+# Create vector store with MMR retriever
+vectorstore = FAISS.from_documents(splits, embeddings)
+retriever = vectorstore.as_retriever(
+    search_type="mmr",  # Maximum Marginal Relevance for diversity
+    search_kwargs={"k": 5, "fetch_k": 20}
+)
+
+# RAG chain
+template_rag = """
+You are the 'Talent Scout 3000'. Your mission is to identify high-potential students.
+
+CONTEXT FROM CVs:
+{context}
+
+QUESTION:
+{question}
+
+Generate a list of matching students with:
+- Student Name (Source File)
+- Why they match: [Brief explanation]
+"""
+
+prompt_rag = ChatPromptTemplate.from_template(template_rag)
+
+def format_docs(docs):
+    return "\n\n".join(f"[Source: {d.metadata['source']}]\n{d.page_content}" for d in docs)
+
+rag_chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt_rag
+    | llm
+    | StrOutputParser()
+)
+
+# Search query
+query = "Which students know Python and have developed complex systems (like a Virtual Library or similar)?"
+print(f"🔍 Search: {query}")
+print("-" * 50)
+response = rag_chain.invoke(query)
+print(response)
+```
+
+**Sample Output:**
+```
+🔍 Search: Which students know Python and have developed complex systems?
+--------------------------------------------------
+
+The following students meet the criteria:
+
+| Student Name (Source) | Why They Match |
+|----------------------|----------------|
+| **Fernanda Mendoza** (CV_Estudiante_2_Fernanda_Mendoza.pdf) | Knows Python (mentioned in profile). **Developed a complex system:** "Virtual Library System with user roles and stock management." |
+| **Nicolas Paredes** (CV_Estudiante_3_Nicolas_Paredes.pdf) | Knows Python (profile and title). **Developed:** "RESTful API for financial management using Python and FastAPI." |
+| **Ximena Rios** (CV_Estudiante_1_Ximena_Rios.pdf) | Knows Python. **Developed:** "RESTful API for financial management using Python and FastAPI." |
+```
+
+## What You Just Did
+
+Congratulations! You've successfully:
+
+<Check>Generated realistic candidate profiles programmatically</Check>
+<Check>Performed single-document RAG analysis on a resume</Check>
+<Check>Extracted structured data from multiple candidates using LLMs</Check>
+<Check>Executed semantic search across a candidate database</Check>
+<Check>Generated natural language explanations for talent matches</Check>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Set up the system locally for production use
+  </Card>
+  <Card title="Architecture Deep Dive" icon="diagram-project" href="/concepts/rag-architecture">
+    Understand how RAG components work together
+  </Card>
+  <Card title="API Reference" icon="code" href="/reference/embeddings">
+    Explore available functions and classes
+  </Card>
+  <Card title="Configuration" icon="paintbrush" href="/guides/configuration">
+    Adapt the system for your specific use case
+  </Card>
+</CardGroup>
+
+<Info>
+  **Pro Tip:** You can export the candidate DataFrame to Excel using `df.to_excel('candidates.xlsx', index=False)` for further analysis in spreadsheet tools.
+</Info>

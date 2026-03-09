@@ -1,0 +1,233 @@
+---
+title: 'Embeddings API'
+description: 'HuggingFace embeddings integration for document vectorization'
+icon: 'vector-square'
+---
+
+## Overview
+
+The RAG Recruitment Assistant uses **HuggingFaceEmbeddings** from LangChain to convert resume text into vector representations for semantic search and retrieval.
+
+## Installation
+
+```bash
+pip install langchain-huggingface
+```
+
+## Basic Setup
+
+<CodeGroup>
+```python Initialization
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# Initialize embeddings model
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+```
+
+```python From Notebook
+# As used in Talent_Scout_3000x.ipynb
+from langchain_huggingface import HuggingFaceEmbeddings
+
+embeddings = HuggingFaceEmbeddings()
+```
+</CodeGroup>
+
+## Configuration Parameters
+
+<ParamField path="model_name" type="string" default="sentence-transformers/all-MiniLM-L6-v2">
+  The HuggingFace model identifier for generating embeddings.
+  
+  **Common Models:**
+  - `sentence-transformers/all-MiniLM-L6-v2` - Fast, lightweight (90MB)
+  - `sentence-transformers/all-mpnet-base-v2` - Higher quality, larger
+  - `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` - Multilingual support
+</ParamField>
+
+<ParamField path="model_kwargs" type="dict" default="{}">
+  Additional keyword arguments passed to the model.
+  
+  ```python
+  embeddings = HuggingFaceEmbeddings(
+      model_kwargs={'device': 'cuda'}  # Use GPU
+  )
+  ```
+</ParamField>
+
+<ParamField path="encode_kwargs" type="dict" default="{}">
+  Arguments for the encode method.
+  
+  ```python
+  embeddings = HuggingFaceEmbeddings(
+      encode_kwargs={'normalize_embeddings': True}
+  )
+  ```
+</ParamField>
+
+<ParamField path="cache_folder" type="string" optional>
+  Directory to cache downloaded models.
+  
+  ```python
+  embeddings = HuggingFaceEmbeddings(
+      cache_folder="./model_cache"
+  )
+  ```
+</ParamField>
+
+## Methods
+
+### embed_documents()
+
+Generate embeddings for multiple documents.
+
+<ParamField path="texts" type="list[str]" required>
+  List of text documents to embed.
+</ParamField>
+
+<ResponseField name="embeddings" type="list[list[float]]">
+  List of embedding vectors, one per input document.
+</ResponseField>
+
+```python
+documents = [
+    "Estudiante de 9no ciclo con Python y React",
+    "Data Analyst con experiencia en PowerBI"
+]
+
+vectors = embeddings.embed_documents(documents)
+print(f"Generated {len(vectors)} embeddings")
+print(f"Vector dimension: {len(vectors[0])}")
+# Output: Generated 2 embeddings
+# Output: Vector dimension: 384
+```
+
+### embed_query()
+
+Generate embedding for a single search query.
+
+<ParamField path="text" type="str" required>
+  Query text to embed.
+</ParamField>
+
+<ResponseField name="embedding" type="list[float]">
+  Single embedding vector for the query.
+</ResponseField>
+
+```python
+query = "Busco desarrollador Python con FastAPI"
+query_vector = embeddings.embed_query(query)
+print(f"Query vector dimension: {len(query_vector)}")
+# Output: Query vector dimension: 384
+```
+
+## Real-World Usage
+
+### From the Talent Scout System
+
+This example shows how embeddings are used in the actual recruitment assistant:
+
+```python reference/notebook/Talent_Scout_3000x.ipynb
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# Initialize embeddings
+embeddings = HuggingFaceEmbeddings()
+
+# Load resume PDF
+loader = PyPDFLoader("CV_Estudiante_4_Fernanda_Paredes.pdf")
+docs = loader.load()
+
+# Create vector store with embeddings
+vectorstore = FAISS.from_documents(docs, embeddings)
+```
+
+### Batch Processing Multiple Resumes
+
+```python
+import glob
+from langchain_community.document_loaders import PyPDFLoader
+
+# Process multiple student resumes
+archivos = glob.glob("cvs_estudiantes_final/*.pdf")
+
+for pdf_path in archivos:
+    loader = PyPDFLoader(pdf_path)
+    pages = loader.load()
+    
+    # Generate embeddings for all pages
+    texts = [p.page_content for p in pages]
+    vectors = embeddings.embed_documents(texts)
+    
+    print(f"Processed {pdf_path}: {len(vectors)} vectors")
+```
+
+## Performance Considerations
+
+<Card title="Model Download" icon="download">
+  On first run, the model (~90MB) is downloaded from HuggingFace Hub. Subsequent runs use the cached version.
+</Card>
+
+<Card title="GPU Acceleration" icon="microchip">
+  ```python
+  # Enable GPU for faster embedding generation
+  embeddings = HuggingFaceEmbeddings(
+      model_kwargs={'device': 'cuda'}
+  )
+  ```
+</Card>
+
+<Card title="Batch Size" icon="layer-group">
+  For large documents, process in batches to avoid memory issues:
+  
+  ```python
+  def batch_embed(texts, batch_size=32):
+      all_embeddings = []
+      for i in range(0, len(texts), batch_size):
+          batch = texts[i:i + batch_size]
+          embeddings_batch = embeddings.embed_documents(batch)
+          all_embeddings.extend(embeddings_batch)
+      return all_embeddings
+  ```
+</Card>
+
+## Error Handling
+
+```python
+import warnings
+from langchain_huggingface import HuggingFaceEmbeddings
+
+try:
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
+    
+    # Test embedding
+    test_vector = embeddings.embed_query("Test query")
+    print(f"✓ Embeddings loaded successfully ({len(test_vector)} dimensions)")
+    
+except Exception as e:
+    print(f"Error loading embeddings: {e}")
+    # Fallback to default model
+    embeddings = HuggingFaceEmbeddings()
+```
+
+## Vector Dimensions
+
+| Model | Dimension | Size | Speed |
+|-------|-----------|------|-------|
+| all-MiniLM-L6-v2 | 384 | 90MB | Fast |
+| all-mpnet-base-v2 | 768 | 420MB | Medium |
+| paraphrase-multilingual-MiniLM-L12-v2 | 384 | 420MB | Medium |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Vector Store" icon="database" href="/reference/vector-store">
+    Learn how to store and search embeddings with FAISS
+  </Card>
+  <Card title="LLM Integration" icon="brain" href="/reference/llm-integration">
+    Connect embeddings to the language model
+  </Card>
+</CardGroup>

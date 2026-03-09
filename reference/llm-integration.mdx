@@ -1,0 +1,617 @@
+---
+title: 'LLM Integration'
+description: 'Google Gemini AI integration for intelligent resume analysis'
+icon: 'brain'
+---
+
+## Overview
+
+The RAG Recruitment Assistant uses **ChatGoogleGenerativeAI** (Gemini 1.5 Flash) to analyze resumes, extract structured data, and provide intelligent candidate assessments.
+
+## Installation
+
+```bash
+pip install langchain-google-genai
+```
+
+## Environment Setup
+
+<Steps>
+  <Step title="Get API Key">
+    Obtain a Google AI API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+  </Step>
+  
+  <Step title="Set Environment Variable">
+    ```bash
+    export GOOGLE_API_KEY="your-api-key-here"
+    ```
+    
+    Or in Python:
+    ```python
+    import os
+    os.environ["GOOGLE_API_KEY"] = "your-api-key-here"
+    ```
+  </Step>
+  
+  <Step title="Verify Configuration">
+    ```python
+    if not os.getenv("GOOGLE_API_KEY"):
+        raise ValueError("Debes configurar la variable de entorno GOOGLE_API_KEY")
+    ```
+  </Step>
+</Steps>
+
+## Basic Configuration
+
+### ChatGoogleGenerativeAI
+
+<ParamField path="model" type="string" default="gemini-pro">
+  The Gemini model to use.
+  
+  **Available Models:**
+  - `gemini-1.5-flash` - Fast, cost-effective (used in notebook)
+  - `gemini-1.5-pro` - More capable, higher quality
+  - `gemini-pro` - Legacy model
+</ParamField>
+
+<ParamField path="temperature" type="float" default="0.7">
+  Controls randomness in responses (0.0 = deterministic, 1.0 = creative).
+  
+  **Recommended Values:**
+  - `0` - Structured data extraction (used in notebook)
+  - `0.3-0.5` - Factual analysis
+  - `0.7-0.9` - Creative content generation
+</ParamField>
+
+<ParamField path="max_output_tokens" type="int" optional>
+  Maximum tokens in the response.
+</ParamField>
+
+<ParamField path="top_p" type="float" default="0.95">
+  Nucleus sampling parameter.
+</ParamField>
+
+<ParamField path="top_k" type="int" default="40">
+  Top-k sampling parameter.
+</ParamField>
+
+<CodeGroup>
+```python Basic Setup
+from langchain_google_genai import ChatGoogleGenerativeAI
+import os
+
+# Ensure API key is set
+if not os.getenv("GOOGLE_API_KEY"):
+    raise ValueError("GOOGLE_API_KEY environment variable not set")
+
+# Initialize LLM
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0
+)
+
+print("LLM configurado correctamente.")
+```
+
+```python From Notebook
+# Real implementation from Talent_Scout_3000x.ipynb
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+# API Key validation
+if not os.getenv("GOOGLE_API_KEY"):
+    raise ValueError("Debes configurar la variable de entorno GOOGLE_API_KEY")
+
+# LLM initialization
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0
+)
+```
+</CodeGroup>
+
+## Prompt Templates
+
+### ChatPromptTemplate
+
+Structure prompts for consistent LLM interactions.
+
+<ParamField path="template" type="str" required>
+  Template string with variable placeholders using `{variable}` syntax.
+</ParamField>
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+
+template = """
+Eres un Mentor de Carrera Tecnológica y experto en empleabilidad joven.
+Tu misión es analizar el perfil de este estudiante basándote SOLO en el siguiente contexto (su CV):
+{context}
+
+Pregunta: {question}
+"""
+
+prompt = ChatPromptTemplate.from_template(template)
+```
+
+### Structured Prompts with Format Instructions
+
+For JSON extraction with Pydantic models:
+
+```python
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
+
+# Define schema
+class PerfilEstudiante(BaseModel):
+    nombre: str = Field(description="Nombre completo del estudiante")
+    universidad: str = Field(description="Universidad o instituto")
+    stack_principal: list = Field(description="Top 5 tecnologías")
+    tipo_perfil: str = Field(description="Backend, Frontend, Data, o Fullstack")
+
+parser = JsonOutputParser(pydantic_object=PerfilEstudiante)
+
+template = """
+Eres un Experto en Reclutamiento IT.
+Analiza el CV y extrae los datos estructurados.
+
+UTILIZA EL SIGUIENTE FORMATO JSON:
+{format_instructions}
+
+TEXTO DEL CV:
+{context}
+"""
+
+prompt = ChatPromptTemplate.from_template(template)
+```
+
+## Chain Composition
+
+### Basic RAG Chain
+
+Combine retrieval and generation for resume Q&A:
+
+```python reference/notebook/Talent_Scout_3000x.ipynb
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
+# Define prompt
+template = """
+Eres un Mentor de Carrera Tecnológica y experto en empleabilidad joven.
+Tu misión es analizar el perfil de este estudiante basándote SOLO en el siguiente contexto (su CV):
+{context}
+
+Pregunta: {question}
+"""
+prompt = ChatPromptTemplate.from_template(template)
+
+# Create chain
+chain = (
+    {"context": retriever, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+# Execute
+pregunta = "¿Qué proyectos destacados tiene este estudiante?"
+respuesta = chain.invoke(pregunta)
+print(respuesta)
+```
+
+### Structured Extraction Chain
+
+For extracting JSON data from resumes:
+
+```python reference/notebook/Talent_Scout_3000x.ipynb
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
+
+# Schema definition
+class PerfilEstudiante(BaseModel):
+    nombre: str = Field(description="Nombre completo")
+    universidad: str = Field(description="Universidad")
+    ciclo_actual: str = Field(description="Ciclo o semestre")
+    stack_principal: list = Field(description="Top 5 tecnologías")
+    tipo_perfil: str = Field(description="Backend, Frontend, Data, Fullstack")
+    potencial_contratacion: str = Field(description="Justificación para contratar")
+
+parser = JsonOutputParser(pydantic_object=PerfilEstudiante)
+
+# Extraction template
+template = """
+Eres un Experto en Empleabilidad Joven y Reclutamiento IT.
+Analiza el CV y extrae los datos estructurados.
+
+UTILIZA EL SIGUIENTE FORMATO JSON:
+{format_instructions}
+
+TEXTO DEL CV:
+{context}
+"""
+
+prompt_extract = ChatPromptTemplate.from_template(template)
+
+# Chain with parser
+chain_extract = prompt_extract | llm | parser
+
+# Execute
+data = chain_extract.invoke({
+    "context": cv_text,
+    "format_instructions": parser.get_format_instructions()
+})
+
+print(data)  # Returns Python dict
+```
+
+## RunnablePassthrough
+
+Pass inputs through chains without modification.
+
+```python
+from langchain_core.runnables import RunnablePassthrough
+
+# Direct passthrough
+chain = (
+    {"question": RunnablePassthrough()}
+    | prompt
+    | llm
+)
+
+result = chain.invoke("What is Python?")
+```
+
+### With Retriever Context
+
+```python
+# Combine retriever output with question passthrough
+chain = (
+    {
+        "context": retriever,           # Retrieves documents
+        "question": RunnablePassthrough()  # Passes question through
+    }
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+```
+
+## Output Parsers
+
+### StrOutputParser
+
+Extract string output from LLM response.
+
+```python
+from langchain_core.output_parsers import StrOutputParser
+
+chain = prompt | llm | StrOutputParser()
+result = chain.invoke({"question": "Explain Python"})
+print(type(result))  # <class 'str'>
+```
+
+### JsonOutputParser
+
+Parse structured JSON responses with validation.
+
+```python
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
+
+class TechStack(BaseModel):
+    languages: list[str] = Field(description="Programming languages")
+    frameworks: list[str] = Field(description="Frameworks")
+    years_experience: int = Field(description="Years of experience")
+
+parser = JsonOutputParser(pydantic_object=TechStack)
+
+chain = prompt | llm | parser
+result = chain.invoke({"context": resume_text})
+print(result)  # Python dict with validated structure
+```
+
+## Real-World Examples
+
+### Example 1: Single Resume Analysis
+
+From the notebook - analyzing individual student profiles:
+
+```python reference/notebook/Talent_Scout_3000x.ipynb
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
+# Load resume
+ruta_archivo = "cvs_estudiantes_final/CV_Estudiante_4_Fernanda_Paredes.pdf"
+loader = PyPDFLoader(ruta_archivo)
+docs = loader.load()
+
+# Create vector store
+vectorstore = FAISS.from_documents(docs, embeddings)
+retriever = vectorstore.as_retriever()
+
+# Prompt template
+template = """
+Eres un Mentor de Carrera Tecnológica y experto en empleabilidad joven.
+Tu misión es analizar el perfil de este estudiante basándote SOLO en el siguiente contexto (su CV):
+{context}
+
+Pregunta: {question}
+"""
+prompt = ChatPromptTemplate.from_template(template)
+
+# Build chain
+chain = (
+    {"context": retriever, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+# Query
+pregunta = "¿Qué proyectos destacados o experiencia académica tiene este estudiante y cuál es su stack tecnológico principal?"
+respuesta = chain.invoke(pregunta)
+print(respuesta)
+```
+
+**Output:**
+```
+Basado en el CV, este es el análisis del perfil de Fernanda Paredes:
+
+### 1. Proyectos Destacados y Experiencia Académica
+
+Fernanda es una estudiante de 9no ciclo de Ingeniería de Software (UTP).
+
+1. **Proyecto Académico como Data Analyst Trainee (Jun 2025 - Feb 2026)**
+2. **Primer puesto en Hackathon universitaria** por desarrollo de app de reciclaje
+
+### 2. Stack Tecnológico Principal
+
+| Área | Tecnologías |
+|------|-------------|
+| Análisis de Datos | Python, PowerBI |
+| Desarrollo | Java, Spring Boot |
+```
+
+### Example 2: Batch Data Extraction
+
+From the notebook - processing multiple resumes:
+
+```python reference/notebook/Talent_Scout_3000x.ipynb
+import glob
+import pandas as pd
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
+from langchain_community.document_loaders import PyPDFLoader
+
+# Schema
+class PerfilEstudiante(BaseModel):
+    nombre: str = Field(description="Nombre completo del estudiante")
+    email: str = Field(description="Email universitario o personal")
+    universidad: str = Field(description="Nombre de la universidad")
+    ciclo_actual: str = Field(description="Ciclo actual")
+    stack_principal: list = Field(description="Top 5 tecnologías")
+    tipo_perfil: str = Field(description="Backend, Frontend, Data, Fullstack")
+    potencial_contratacion: str = Field(description="Por qué contratarlo")
+
+parser = JsonOutputParser(pydantic_object=PerfilEstudiante)
+
+# Extraction prompt
+template = """
+Eres un Experto en Empleabilidad Joven y Reclutamiento IT.
+Analiza el CV y extrae los datos estructurados.
+
+UTILIZA EL SIGUIENTE FORMATO JSON:
+{format_instructions}
+
+TEXTO DEL CV:
+{context}
+"""
+
+prompt_extract = ChatPromptTemplate.from_template(template)
+chain_extract = prompt_extract | llm | parser
+
+# Process all resumes
+resultados = []
+archivos = glob.glob("cvs_estudiantes_final/*.pdf")
+
+print(f"Analizando {len(archivos)} estudiantes...")
+
+for pdf in archivos:
+    try:
+        loader = PyPDFLoader(pdf)
+        pages = loader.load()
+        texto_completo = "\n".join([p.page_content for p in pages])
+        
+        # Extract structured data
+        data = chain_extract.invoke({
+            "context": texto_completo,
+            "format_instructions": parser.get_format_instructions()
+        })
+        
+        data['archivo_origen'] = pdf.split("/")[-1]
+        resultados.append(data)
+        
+        print(f"Procesado: {data['nombre']} ({data['ciclo_actual']}) -> {data['tipo_perfil']}")
+    
+    except Exception as e:
+        print(f"Error: {e}")
+
+# Create DataFrame
+df_talent = pd.DataFrame(resultados)
+print("\nTABLA DE TALENTO:")
+print(df_talent[['nombre', 'universidad', 'tipo_perfil', 'stack_principal']])
+```
+
+**Output:**
+```
+Analizando 5 estudiantes...
+Procesado: FERNANDA PAREDES (9no Ciclo) -> Data
+Procesado: XIMENA RIOS (9no ciclo) -> Fullstack
+Procesado: NICOLAS PAREDES (7mo Ciclo) -> Fullstack
+Procesado: LUCIANA CORDOVA (8vo ciclo) -> Fullstack
+Procesado: FERNANDA MENDOZA (8vo Ciclo) -> Fullstack
+
+TABLA DE TALENTO:
+             nombre universidad tipo_perfil                          stack_principal
+0  FERNANDA PAREDES         UTP        Data  [Python, PowerBI, Java, Spring Boot]
+1       XIMENA RIOS  San Marcos   Fullstack      [Python, FastAPI, Java, React...]
+```
+
+## Advanced Configuration
+
+### Streaming Responses
+
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0,
+    streaming=True
+)
+
+for chunk in llm.stream("Explica qué es Python"):
+    print(chunk.content, end="", flush=True)
+```
+
+### Custom System Instructions
+
+```python
+from langchain_core.messages import SystemMessage, HumanMessage
+
+messages = [
+    SystemMessage(content="Eres un experto en reclutamiento tecnológico."),
+    HumanMessage(content="Analiza este perfil: Python developer con 3 años de experiencia")
+]
+
+response = llm.invoke(messages)
+print(response.content)
+```
+
+### Function Calling
+
+```python
+functions = [
+    {
+        "name": "extract_skills",
+        "description": "Extract technical skills from a resume",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "languages": {"type": "array", "items": {"type": "string"}},
+                "frameworks": {"type": "array", "items": {"type": "string"}}
+            },
+            "required": ["languages", "frameworks"]
+        }
+    }
+]
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0
+)
+
+llm_with_functions = llm.bind(functions=functions)
+```
+
+## Model Parameters Comparison
+
+| Parameter | Conservative | Balanced | Creative |
+|-----------|-------------|----------|----------|
+| temperature | 0.0 | 0.5 | 0.9 |
+| top_p | 0.1 | 0.8 | 0.95 |
+| top_k | 1 | 40 | 100 |
+| **Use Case** | Data extraction | Analysis | Content generation |
+
+## Error Handling
+
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+import os
+
+try:
+    # Validate API key
+    if not os.getenv("GOOGLE_API_KEY"):
+        raise ValueError("GOOGLE_API_KEY not configured")
+    
+    # Initialize LLM
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        temperature=0
+    )
+    
+    # Test connection
+    response = llm.invoke("Hello")
+    print("✓ LLM initialized successfully")
+    
+except ValueError as e:
+    print(f"Configuration error: {e}")
+except Exception as e:
+    print(f"LLM error: {e}")
+    # Fallback or retry logic
+```
+
+## Rate Limiting
+
+```python
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10)
+)
+def query_llm_with_retry(chain, query):
+    return chain.invoke(query)
+
+# Usage
+try:
+    result = query_llm_with_retry(chain, "Analyze this resume")
+except Exception as e:
+    print(f"Failed after retries: {e}")
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Temperature Settings" icon="temperature-half">
+    - **0.0**: Data extraction, structured output
+    - **0.3-0.5**: Analysis and classification
+    - **0.7-0.9**: Creative writing, summaries
+  </Card>
+  
+  <Card title="Prompt Engineering" icon="wand-magic-sparkles">
+    - Be specific about the role ("Mentor", "Recruiter")
+    - Provide clear context boundaries
+    - Use examples for complex tasks
+    - Request specific output formats
+  </Card>
+  
+  <Card title="Token Management" icon="coins">
+    - Set `max_output_tokens` for long responses
+    - Chunk large documents before processing
+    - Monitor API usage with logging
+  </Card>
+  
+  <Card title="Validation" icon="shield-check">
+    - Use Pydantic models for structured output
+    - Validate API key before batch jobs
+    - Test chains with sample data first
+    - Handle parsing errors gracefully
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Embeddings" icon="vector-square" href="/reference/embeddings">
+    Learn about vector embeddings
+  </Card>
+  <Card title="Vector Store" icon="database" href="/reference/vector-store">
+    Master FAISS for semantic search
+  </Card>
+</CardGroup>

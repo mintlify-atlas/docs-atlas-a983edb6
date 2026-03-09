@@ -1,0 +1,433 @@
+---
+title: 'Profile Analysis'
+description: 'Query individual CVs using RAG chain with retriever, prompt, and LLM'
+icon: 'magnifying-glass'
+---
+
+## Overview
+
+Profile Analysis allows you to interrogate individual CVs using a RAG (Retrieval-Augmented Generation) chain. The system reads a PDF, creates vector embeddings, and answers questions about the candidate's profile.
+
+## How It Works
+
+<Steps>
+  <Step title="Load PDF Document">
+    Use LangChain's `PyPDFLoader` to extract text from the CV:
+    
+    ```python
+    from langchain_community.document_loaders import PyPDFLoader
+    
+    loader = PyPDFLoader("path/to/cv.pdf")
+    docs = loader.load()
+    ```
+  </Step>
+  
+  <Step title="Create Vector Store">
+    Convert the document into embeddings and store in FAISS:
+    
+    ```python
+    from langchain_community.vectorstores import FAISS
+    
+    vectorstore = FAISS.from_documents(docs, embeddings)
+    retriever = vectorstore.as_retriever()
+    ```
+  </Step>
+  
+  <Step title="Define Prompt Template">
+    Create a specialized prompt for career mentoring:
+    
+    ```python
+    template = """
+    Eres un Mentor de Carrera Tecnológica y experto en empleabilidad joven.
+    Tu misión es analizar el perfil de este estudiante basándote SOLO en el siguiente contexto (su CV):
+    {context}
+    
+    Pregunta: {question}
+    """
+    ```
+  </Step>
+  
+  <Step title="Build RAG Chain">
+    Combine retriever, prompt, and LLM:
+    
+    ```python
+    chain = (
+        {"context": retriever, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+    ```
+  </Step>
+  
+  <Step title="Query the CV">
+    Ask questions about the candidate:
+    
+    ```python
+    respuesta = chain.invoke("What are this student's main skills?")
+    ```
+  </Step>
+</Steps>
+
+## Complete Implementation
+
+<CodeGroup>
+```python Full RAG Chain
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+import os, random
+
+# 1. SELECTION
+carpeta_fuente = "cvs_estudiantes_final"
+
+# Verify files exist
+archivos_disponibles = os.listdir(carpeta_fuente)
+if not archivos_disponibles:
+    raise Exception("No CVs found. Make sure to run CV generation first.")
+
+# Choose one randomly
+archivo_elegido = random.choice(archivos_disponibles)
+ruta_archivo = f"{carpeta_fuente}/{archivo_elegido}"
+
+print(f"📂 Selected student profile: '{archivo_elegido}'")
+print("⏳ Reading PDF and creating vectors...")
+
+# 2. LOAD AND VECTORIZATION
+loader = PyPDFLoader(ruta_archivo)
+docs = loader.load()
+vectorstore = FAISS.from_documents(docs, embeddings)
+retriever = vectorstore.as_retriever()
+
+# 3. PROMPT
+template = """
+Eres un Mentor de Carrera Tecnológica y experto en empleabilidad joven.
+Tu misión es analizar el perfil de este estudiante basándote SOLO en el siguiente contexto (su CV):
+{context}
+
+Pregunta: {question}
+"""
+prompt = ChatPromptTemplate.from_template(template)
+
+# 4. EXECUTION
+chain = (
+    {"context": retriever, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+# 5. QUESTION (Focused on potential and skills, not years of experience)
+pregunta = "¿Qué proyectos destacados o experiencia académica tiene este estudiante y cuál es su stack tecnológico principal?"
+respuesta = chain.invoke(pregunta)
+
+print(f"\n MENTOR QUESTION: {pregunta}")
+print("-" * 50)
+print(f"🤖 PROFILE ANALYSIS:\n{respuesta}")
+```
+
+```python Simple Query
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
+# Load CV
+loader = PyPDFLoader("cv_student.pdf")
+docs = loader.load()
+
+# Create vector store
+vectorstore = FAISS.from_documents(docs, embeddings)
+retriever = vectorstore.as_retriever()
+
+# Build chain
+template = "Context: {context}\n\nQuestion: {question}"
+prompt = ChatPromptTemplate.from_template(template)
+
+chain = (
+    {"context": retriever, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+# Query
+answer = chain.invoke("What technologies does this candidate know?")
+print(answer)
+```
+</CodeGroup>
+
+## RAG Chain Components
+
+<CardGroup cols={3}>
+  <Card title="Retriever" icon="database">
+    Searches the vector store for relevant CV sections based on the question
+  </Card>
+  
+  <Card title="Prompt" icon="message">
+    Instructs the LLM on how to analyze the retrieved context
+  </Card>
+  
+  <Card title="LLM" icon="brain">
+    Generates human-readable analysis from the context
+  </Card>
+</CardGroup>
+
+## Prompt Engineering
+
+### Effective Prompts for Student Analysis
+
+The system uses a **Career Mentor** persona to focus on potential rather than experience:
+
+<Tabs>
+  <Tab title="Mentor Prompt">
+    ```python
+    template = """
+    Eres un Mentor de Carrera Tecnológica y experto en empleabilidad joven.
+    Tu misión es analizar el perfil de este estudiante basándote SOLO en el siguiente contexto (su CV):
+    {context}
+    
+    Pregunta: {question}
+    """
+    ```
+    
+    This prompt:
+    - Sets expertise context (tech career mentoring)
+    - Focuses on **young talent employability**
+    - Constrains responses to CV content only
+  </Tab>
+  
+  <Tab title="Technical Prompt">
+    ```python
+    template = """
+    You are a Technical Recruiter specializing in junior developers.
+    Analyze this student's CV and focus on:
+    - Academic projects and practical experience
+    - Technical skills and tools
+    - Learning potential and growth mindset
+    
+    CV Content:
+    {context}
+    
+    Question: {question}
+    """
+    ```
+  </Tab>
+  
+  <Tab title="Skills Assessment">
+    ```python
+    template = """
+    As a Skills Assessment Expert, evaluate this student's profile.
+    Rate their proficiency in:
+    - Programming languages
+    - Frameworks and tools
+    - Project complexity
+    - Team collaboration
+    
+    Student CV:
+    {context}
+    
+    Question: {question}
+    """
+    ```
+  </Tab>
+</Tabs>
+
+## Example Questions
+
+Here are effective questions to ask about student profiles:
+
+<AccordionGroup>
+  <Accordion title="Projects & Experience">
+    ```python
+    questions = [
+        "¿Qué proyectos destacados tiene este estudiante?",
+        "What academic projects has this candidate completed?",
+        "Describe the most impressive achievement in this CV",
+        "What practical experience does this student have?"
+    ]
+    ```
+  </Accordion>
+  
+  <Accordion title="Technical Skills">
+    ```python
+    questions = [
+        "¿Cuál es su stack tecnológico principal?",
+        "What programming languages does this candidate know?",
+        "List all frameworks and tools mentioned",
+        "What is their strongest technical area?"
+    ]
+    ```
+  </Accordion>
+  
+  <Accordion title="Potential Assessment">
+    ```python
+    questions = [
+        "¿Por qué deberíamos contratar a este estudiante como practicante?",
+        "What makes this candidate stand out?",
+        "Assess this student's learning potential",
+        "What role would be the best fit for this profile?"
+    ]
+    ```
+  </Accordion>
+  
+  <Accordion title="Cultural Fit">
+    ```python
+    questions = [
+        "¿Qué tipo de equipo se ajustaría mejor a este perfil?",
+        "Does this student show leadership potential?",
+        "What are their collaboration skills based on the CV?",
+        "Describe this candidate's work style"
+    ]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Retriever Configuration
+
+Customize how the system retrieves relevant information:
+
+```python
+# Basic retriever
+retriever = vectorstore.as_retriever()
+
+# With custom parameters
+retriever = vectorstore.as_retriever(
+    search_type="similarity",
+    search_kwargs={"k": 3}  # Return top 3 most relevant chunks
+)
+
+# MMR (Maximum Marginal Relevance) for diversity
+retriever = vectorstore.as_retriever(
+    search_type="mmr",
+    search_kwargs={
+        "k": 4,
+        "fetch_k": 10,  # Fetch 10, return 4 most diverse
+        "lambda_mult": 0.5  # Balance relevance vs diversity
+    }
+)
+
+# Similarity with score threshold
+retriever = vectorstore.as_retriever(
+    search_type="similarity_score_threshold",
+    search_kwargs={
+        "score_threshold": 0.8,  # Only high-confidence matches
+        "k": 5
+    }
+)
+```
+
+<Note>
+**Best Practice:** For student CVs, use `k=3` with `similarity` search. Student CVs are typically short (1-2 pages), so fewer chunks with higher relevance work better than diverse results.
+</Note>
+
+## Output Examples
+
+### Sample Analysis Output
+
+```markdown
+Based on the CV, here's the profile analysis:
+
+### Outstanding Projects and Academic Experience
+
+Fernanda Paredes is a 9th-semester Software Engineering student (UTP) 
+seeking her first professional opportunity as a Data Analyst Trainee.
+
+**Experience and projects:**
+
+1. **Academic Project as Data Analyst Trainee (Jun 2025 - Feb 2026):** 
+   Focus on data analysis
+2. **Outstanding Achievement (Hackathon):** 
+   First place in university Hackathon for developing a recycling app. 
+   Demonstrates ability to work under pressure, innovation, and practical 
+   application of software development knowledge.
+
+### Main Technology Stack
+
+| Area | Technologies |
+| :--- | :--- |
+| **Data Analysis / BI** | Python, PowerBI |
+| **Software Development** | Java, Spring Boot |
+
+**Mentor's Conclusion:**
+
+Fernanda has a solid foundation in development tools (Java, Spring Boot) 
+and has shown proactivity in the data area (Python, PowerBI), which aligns 
+with her goal of becoming a Data Analyst Trainee. Winning a Hackathon is 
+a strong indicator of high potential and execution capability.
+```
+
+## Error Handling
+
+<CodeGroup>
+```python File Validation
+import os
+
+carpeta_fuente = "cvs_estudiantes_final"
+
+# Check if directory exists
+if not os.path.exists(carpeta_fuente):
+    raise FileNotFoundError(f"Directory '{carpeta_fuente}' not found. Run CV generation first.")
+
+# Check if files exist
+archivos_disponibles = [f for f in os.listdir(carpeta_fuente) if f.endswith('.pdf')]
+
+if not archivos_disponibles:
+    raise Exception("No PDF files found. Generate CVs before running analysis.")
+
+print(f"Found {len(archivos_disponibles)} CVs")
+```
+
+```python Chain Validation
+try:
+    respuesta = chain.invoke(pregunta)
+    print(respuesta)
+except Exception as e:
+    print(f"Error during analysis: {e}")
+    print("Check that:")
+    print("1. GOOGLE_API_KEY is set")
+    print("2. Embeddings model is loaded")
+    print("3. PDF is readable")
+```
+</CodeGroup>
+
+## Performance Tips
+
+<CardGroup cols={2}>
+  <Card title="Cache Embeddings" icon="bolt">
+    Reuse the vector store for multiple questions:
+    
+    ```python
+    # Create once
+    vectorstore = FAISS.from_documents(docs, embeddings)
+    
+    # Query multiple times
+    for question in questions:
+        answer = chain.invoke(question)
+    ```
+  </Card>
+  
+  <Card title="Batch Processing" icon="layer-group">
+    Process multiple questions in parallel:
+    
+    ```python
+    questions = ["Q1", "Q2", "Q3"]
+    answers = chain.batch(questions)
+    ```
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Talent Mining" icon="users" href="/guides/talent-mining">
+    Process multiple CVs in batch mode
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure LLM and embeddings settings
+  </Card>
+</CardGroup>

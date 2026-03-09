@@ -1,0 +1,614 @@
+---
+title: 'Configuration'
+description: 'Configure environment variables, LLM settings, embeddings, and FAISS parameters'
+icon: 'gear'
+---
+
+## Overview
+
+The RAG Recruitment Assistant requires configuration of several components: Google Generative AI (Gemini), HuggingFace embeddings, and FAISS vector store.
+
+## Environment Variables
+
+### Google API Key
+
+The system uses Google's Gemini model, which requires an API key:
+
+<CodeGroup>
+```bash Windows
+setx GOOGLE_API_KEY "your_api_key_here"
+```
+
+```bash macOS/Linux
+export GOOGLE_API_KEY="your_api_key_here"
+
+# Add to ~/.bashrc or ~/.zshrc for persistence
+echo 'export GOOGLE_API_KEY="your_api_key_here"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+```python Python (.env file)
+# Create a .env file in your project root
+GOOGLE_API_KEY=your_api_key_here
+
+# Load in Python
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+api_key = os.getenv("GOOGLE_API_KEY")
+```
+</CodeGroup>
+
+<Note>
+Get your free Gemini API key at [Google AI Studio](https://makersuite.google.com/app/apikey)
+</Note>
+
+### Validation
+
+The setup cell validates the API key before proceeding:
+
+```python
+import os
+
+if not os.getenv("GOOGLE_API_KEY"):
+    raise ValueError("You must configure the GOOGLE_API_KEY environment variable")
+
+print("✓ API Key configured")
+```
+
+## LLM Configuration
+
+### Gemini 1.5 Flash Setup
+
+The project uses Gemini 1.5 Flash for fast, cost-effective inference:
+
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0
+)
+
+print("LLM configured successfully.")
+```
+
+### Model Parameters
+
+<ParamField path="model" type="string" default="gemini-1.5-flash" required>
+  The Gemini model to use. Options:
+  - `gemini-1.5-flash`: Fast, cost-effective (recommended)
+  - `gemini-1.5-pro`: More capable but slower
+  - `gemini-pro`: Previous generation
+</ParamField>
+
+<ParamField path="temperature" type="float" default="0" required>
+  Controls randomness in responses.
+  - `0`: Deterministic, consistent outputs (recommended for data extraction)
+  - `0.7`: Balanced creativity
+  - `1.0`: Maximum creativity (use for text generation)
+</ParamField>
+
+<ParamField path="max_output_tokens" type="int" default="2048">
+  Maximum length of the generated response.
+</ParamField>
+
+<ParamField path="top_p" type="float" default="0.95">
+  Nucleus sampling parameter. Lower values make output more focused.
+</ParamField>
+
+<ParamField path="top_k" type="int" default="40">
+  Top-k sampling parameter. Limits token selection to top k options.
+</ParamField>
+
+### Advanced Configuration
+
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0,
+    max_output_tokens=2048,
+    top_p=0.95,
+    top_k=40,
+    # Safety settings (optional)
+    safety_settings={
+        "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+        "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+        "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
+        "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
+    }
+)
+```
+
+<Warning>
+For production use, keep safety settings at their default (BLOCK_MEDIUM_AND_ABOVE). Only disable for testing with controlled content.
+</Warning>
+
+## Embeddings Configuration
+
+### HuggingFace Embeddings
+
+The system uses `sentence-transformers/all-MiniLM-L6-v2` for creating vector embeddings:
+
+```python
+from langchain_huggingface import HuggingFaceEmbeddings
+
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
+print("Embeddings model loaded.")
+```
+
+### Model Selection
+
+<Tabs>
+  <Tab title="all-MiniLM-L6-v2 (Default)">
+    **Recommended for most use cases**
+    
+    ```python
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
+    ```
+    
+    - **Dimensions:** 384
+    - **Speed:** Very fast
+    - **Quality:** Good for general text
+    - **Size:** ~80MB
+  </Tab>
+  
+  <Tab title="all-mpnet-base-v2">
+    **Higher quality, slower**
+    
+    ```python
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-mpnet-base-v2"
+    )
+    ```
+    
+    - **Dimensions:** 768
+    - **Speed:** Medium
+    - **Quality:** Better semantic understanding
+    - **Size:** ~420MB
+  </Tab>
+  
+  <Tab title="multilingual-e5-base">
+    **For Spanish/multilingual content**
+    
+    ```python
+    embeddings = HuggingFaceEmbeddings(
+        model_name="intfloat/multilingual-e5-base"
+    )
+    ```
+    
+    - **Dimensions:** 768
+    - **Speed:** Medium
+    - **Quality:** Excellent for Spanish
+    - **Size:** ~1.1GB
+  </Tab>
+</Tabs>
+
+### Advanced Embeddings Configuration
+
+```python
+from langchain_huggingface import HuggingFaceEmbeddings
+
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2",
+    model_kwargs={
+        'device': 'cpu'  # Use 'cuda' for GPU acceleration
+    },
+    encode_kwargs={
+        'normalize_embeddings': True,  # L2 normalization
+        'batch_size': 32  # Batch size for encoding
+    }
+)
+```
+
+<Info>
+**GPU Acceleration:** If you have a CUDA-compatible GPU, set `device='cuda'` for 10-50x faster embedding generation.
+</Info>
+
+## FAISS Configuration
+
+### Basic Setup
+
+FAISS (Facebook AI Similarity Search) is used for vector storage and retrieval:
+
+```python
+from langchain_community.vectorstores import FAISS
+from langchain_community.document_loaders import PyPDFLoader
+
+# Load documents
+loader = PyPDFLoader("cv.pdf")
+docs = loader.load()
+
+# Create vector store
+vectorstore = FAISS.from_documents(docs, embeddings)
+
+# Save for later use
+vectorstore.save_local("faiss_index")
+
+# Load existing index
+vectorstore = FAISS.load_local(
+    "faiss_index", 
+    embeddings,
+    allow_dangerous_deserialization=True
+)
+```
+
+### Retriever Parameters
+
+```python
+# Basic retriever
+retriever = vectorstore.as_retriever()
+
+# With custom parameters
+retriever = vectorstore.as_retriever(
+    search_type="similarity",
+    search_kwargs={"k": 3}  # Return top 3 results
+)
+```
+
+### Search Types
+
+<Tabs>
+  <Tab title="Similarity (Default)">
+    Returns the k most similar documents:
+    
+    ```python
+    retriever = vectorstore.as_retriever(
+        search_type="similarity",
+        search_kwargs={"k": 3}
+    )
+    ```
+  </Tab>
+  
+  <Tab title="MMR (Diversity)">
+    Maximum Marginal Relevance - balances relevance and diversity:
+    
+    ```python
+    retriever = vectorstore.as_retriever(
+        search_type="mmr",
+        search_kwargs={
+            "k": 4,
+            "fetch_k": 10,  # Fetch 10, return 4 most diverse
+            "lambda_mult": 0.5  # 0=max diversity, 1=max relevance
+        }
+    )
+    ```
+  </Tab>
+  
+  <Tab title="Score Threshold">
+    Only return results above a similarity threshold:
+    
+    ```python
+    retriever = vectorstore.as_retriever(
+        search_type="similarity_score_threshold",
+        search_kwargs={
+            "score_threshold": 0.8,  # Only high-confidence matches
+            "k": 5
+        }
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Performance Tuning
+
+```python
+from langchain_community.vectorstores import FAISS
+import faiss
+
+# Create FAISS index with custom parameters
+index = faiss.IndexFlatL2(384)  # 384 = embedding dimension
+
+# For larger datasets, use IVF (Inverted File Index)
+nlist = 100  # Number of clusters
+quantizer = faiss.IndexFlatL2(384)
+index = faiss.IndexIVFFlat(quantizer, 384, nlist)
+
+# Train the index (required for IVF)
+# index.train(training_vectors)
+
+# Use with LangChain
+vectorstore = FAISS(
+    embedding_function=embeddings.embed_query,
+    index=index,
+    docstore=docstore,
+    index_to_docstore_id=index_to_docstore_id
+)
+```
+
+## Complete Setup Code
+
+<CodeGroup>
+```python Full Configuration
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
+
+print("Installing libraries and configuring...")
+
+# 1. API Key Validation
+if not os.getenv("GOOGLE_API_KEY"):
+    raise ValueError("You must configure the GOOGLE_API_KEY environment variable")
+
+print("✓ API Key configured")
+
+# 2. LLM Configuration
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0
+)
+
+print("✓ LLM configured (gemini-1.5-flash)")
+
+# 3. Embeddings Configuration
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
+print("✓ Embeddings model loaded")
+print("Configuration complete: All ready.")
+```
+
+```python Minimal Setup
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# Validate API key
+if not os.getenv("GOOGLE_API_KEY"):
+    raise ValueError("Set GOOGLE_API_KEY environment variable")
+
+# Configure LLM
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0
+)
+
+# Configure embeddings
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
+print("Setup complete")
+```
+</CodeGroup>
+
+## Dependencies
+
+Install all required packages:
+
+```bash
+pip install -r requirements.txt
+```
+
+### requirements.txt
+
+```txt
+langchain
+langchain-community
+langchain-google-genai
+langchain-huggingface
+sentence-transformers
+faiss-cpu
+pypdf
+reportlab
+pandas==2.2.2
+matplotlib
+plotly
+```
+
+<Note>
+For GPU support, replace `faiss-cpu` with `faiss-gpu` in requirements.txt
+</Note>
+
+## Platform-Specific Notes
+
+<Tabs>
+  <Tab title="Google Colab">
+    The project was developed and tested in Google Colab:
+    
+    ```python
+    # Install packages (run once per session)
+    !pip install -q langchain langchain-google-genai langchain-huggingface \
+                     langchain-community sentence-transformers faiss-cpu \
+                     pypdf reportlab pandas matplotlib plotly
+    
+    # Set API key
+    from google.colab import userdata
+    os.environ["GOOGLE_API_KEY"] = userdata.get('GOOGLE_API_KEY')
+    ```
+  </Tab>
+  
+  <Tab title="Local (Python 3.10/3.11)">
+    For local execution:
+    
+    ```bash
+    # Create virtual environment
+    python3.11 -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    
+    # Install dependencies
+    pip install -r requirements.txt
+    
+    # Set environment variable
+    export GOOGLE_API_KEY="your_key_here"
+    
+    # Run Jupyter
+    jupyter notebook
+    ```
+  </Tab>
+  
+  <Tab title="Docker">
+    Run in Docker container:
+    
+    ```dockerfile
+    FROM python:3.11-slim
+    
+    WORKDIR /app
+    
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+    
+    COPY . .
+    
+    ENV GOOGLE_API_KEY=""
+    
+    CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--allow-root"]
+    ```
+    
+    ```bash
+    docker build -t rag-recruitment .
+    docker run -p 8888:8888 -e GOOGLE_API_KEY="your_key" rag-recruitment
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="API Key Not Found">
+    **Error:** `ValueError: You must configure the GOOGLE_API_KEY environment variable`
+    
+    **Solution:**
+    ```bash
+    # Check if variable is set
+    echo $GOOGLE_API_KEY
+    
+    # Set it
+    export GOOGLE_API_KEY="your_key_here"
+    
+    # Verify in Python
+    import os
+    print(os.getenv("GOOGLE_API_KEY"))
+    ```
+  </Accordion>
+  
+  <Accordion title="FAISS Import Error">
+    **Error:** `ModuleNotFoundError: No module named 'faiss'`
+    
+    **Solution:**
+    ```bash
+    # Install FAISS
+    pip install faiss-cpu
+    
+    # Or for GPU:
+    pip install faiss-gpu
+    ```
+  </Accordion>
+  
+  <Accordion title="Embeddings Model Download Fails">
+    **Error:** `OSError: Can't load tokenizer for 'sentence-transformers/...'`
+    
+    **Solution:**
+    ```python
+    # Pre-download the model
+    from sentence_transformers import SentenceTransformer
+    
+    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    
+    # Then use with LangChain
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Out of Memory (OOM)">
+    **Error:** `RuntimeError: CUDA out of memory` or system freezes
+    
+    **Solution:**
+    ```python
+    # Use CPU instead of GPU
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_kwargs={'device': 'cpu'}
+    )
+    
+    # Reduce batch size
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        encode_kwargs={'batch_size': 8}  # Default is 32
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Temperature Setting" icon="temperature-half">
+    Use `temperature=0` for:
+    - Structured data extraction
+    - Consistent outputs
+    - Classification tasks
+    
+    Use `temperature=0.7-1.0` for:
+    - Creative writing
+    - Varied responses
+    - Brainstorming
+  </Card>
+  
+  <Card title="Model Selection" icon="microchip">
+    Use `gemini-1.5-flash` for:
+    - High-volume processing
+    - Cost-sensitive applications
+    - Fast response times
+    
+    Use `gemini-1.5-pro` for:
+    - Complex reasoning
+    - Long context (100k+ tokens)
+    - Higher accuracy requirements
+  </Card>
+  
+  <Card title="Embeddings Cache" icon="database">
+    Save FAISS index to disk:
+    ```python
+    vectorstore.save_local("index")
+    ```
+    
+    Reuse instead of recreating:
+    ```python
+    vectorstore = FAISS.load_local(
+        "index", embeddings,
+        allow_dangerous_deserialization=True
+    )
+    ```
+  </Card>
+  
+  <Card title="Environment Variables" icon="key">
+    Use `.env` files for development:
+    ```python
+    from dotenv import load_dotenv
+    load_dotenv()
+    ```
+    
+    Use system variables for production:
+    ```bash
+    export GOOGLE_API_KEY="..."
+    ```
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="CV Generation" icon="file-pdf" href="/guides/cv-generation">
+    Generate synthetic student CVs
+  </Card>
+  
+  <Card title="Profile Analysis" icon="magnifying-glass" href="/guides/profile-analysis">
+    Query individual CVs with RAG
+  </Card>
+  
+  <Card title="Talent Mining" icon="users" href="/guides/talent-mining">
+    Batch process multiple CVs
+  </Card>
+</CardGroup>

@@ -1,0 +1,578 @@
+---
+title: 'Talent Mining'
+description: 'Batch process multiple CVs with structured data extraction using Pydantic models'
+icon: 'users'
+---
+
+## Overview
+
+Talent Mining enables batch processing of multiple CVs to extract structured data, analyze patterns, and visualize insights. This is the "Reverse Match" feature that prioritizes potential over experience.
+
+## Architecture
+
+<Steps>
+  <Step title="Define Data Schema">
+    Use Pydantic models to define the structure:
+    
+    ```python
+    from pydantic import BaseModel, Field
+    
+    class PerfilEstudiante(BaseModel):
+        nombre: str
+        stack_principal: list
+        tipo_perfil: str
+        potencial_contratacion: str
+    ```
+  </Step>
+  
+  <Step title="Create JSON Parser">
+    LangChain's `JsonOutputParser` ensures structured output:
+    
+    ```python
+    from langchain_core.output_parsers import JsonOutputParser
+    
+    parser = JsonOutputParser(pydantic_object=PerfilEstudiante)
+    ```
+  </Step>
+  
+  <Step title="Process All CVs">
+    Iterate through the CV directory:
+    
+    ```python
+    import glob
+    
+    archivos = glob.glob("cvs_estudiantes_final/*.pdf")
+    for pdf in archivos:
+        data = chain_extract.invoke({"context": text})
+    ```
+  </Step>
+  
+  <Step title="Analyze Results">
+    Use pandas and plotly for analysis:
+    
+    ```python
+    import pandas as pd
+    
+    df = pd.DataFrame(resultados)
+    ```
+  </Step>
+</Steps>
+
+## Pydantic Schema
+
+### Complete Student Profile Model
+
+```python
+from pydantic import BaseModel, Field
+
+class PerfilEstudiante(BaseModel):
+    """Structured data model for student profiles"""
+    
+    # Personal Data
+    nombre: str = Field(description="Full name of the student")
+    email: str = Field(description="University or personal email")
+    ubicacion: str = Field(description="City/Country")
+    
+    # Academic Profile
+    universidad: str = Field(description="University or institute name")
+    carrera: str = Field(description="Degree program (e.g., Software Engineering)")
+    ciclo_actual: str = Field(description="Current semester or cycle (e.g., 7th Semester, Graduate)")
+    
+    # Tech Talent
+    stack_principal: list = Field(description="List of top 5 languages/technologies mastered")
+    proyectos_destacados: list = Field(description="Names of academic projects, thesis, or freelance work mentioned")
+    
+    # Profile Assessment
+    tipo_perfil: str = Field(description="Classify as: Backend, Frontend, Data, Fullstack, or Management")
+    potencial_contratacion: str = Field(description="Brief justification for hiring as an intern")
+```
+
+<Note>
+The schema focuses on **potential indicators** rather than years of experience:
+- Academic projects instead of job history
+- Skills and tools instead of job titles
+- Learning capacity instead of seniority
+</Note>
+
+## Extraction Prompt
+
+### Specialized Prompt for Junior Talent
+
+```python
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+
+parser = JsonOutputParser(pydantic_object=PerfilEstudiante)
+
+template_estudiantes = """
+Eres un Experto en Empleabilidad Joven y Reclutamiento IT.
+Analiza el CV de este estudiante y extrae los datos estructurados.
+
+UTILIZA EL SIGUIENTE FORMATO JSON:
+{format_instructions}
+
+REGLAS DE EXTRACCIÓN (Enfoque en Potencial):
+
+1. ACADÉMICO:
+   - Busca el ciclo actual (ej. "VI Ciclo", "7mo", "Egresado"). Si no dice, infiérelo por las fechas.
+   - Universidad: Extrae el nombre principal (ej. "UTP", "UPC", "San Marcos").
+
+2. PROYECTOS (Clave para juniors):
+   - Busca secciones como "Proyectos Académicos", "Freelance" o "Experiencia".
+   - Extrae nombres de proyectos concretos (ej. "Sistema de Biblioteca", "App de Reciclaje").
+   - NO pongas nombres de empresas genéricas, busca QUÉ HIZO.
+
+3. TIPO DE PERFIL:
+   - Analiza sus skills.
+   - Si sabe Python + Pandas -> "Data".
+   - Si sabe React + Node -> "Fullstack".
+   - Si sabe Java + Spring -> "Backend".
+
+TEXTO DEL CV:
+{context}
+"""
+
+prompt_extract = ChatPromptTemplate.from_template(template_estudiantes)
+
+# Create extraction chain
+chain_extract = prompt_extract | llm | parser
+```
+
+## Complete Batch Processing Code
+
+<CodeGroup>
+```python Full Implementation
+import glob
+import pandas as pd
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.prompts import ChatPromptTemplate
+
+# Data Schema
+class PerfilEstudiante(BaseModel):
+    # Personal Data
+    nombre: str = Field(description="Full name of the student")
+    email: str = Field(description="University or personal email")
+    ubicacion: str = Field(description="City/Country")
+    
+    # Academic Profile
+    universidad: str = Field(description="University or institute name")
+    carrera: str = Field(description="Degree program")
+    ciclo_actual: str = Field(description="Current semester/cycle")
+    
+    # Tech Talent
+    stack_principal: list = Field(description="Top 5 technologies")
+    proyectos_destacados: list = Field(description="Academic/freelance projects")
+    
+    # Profile Assessment
+    tipo_perfil: str = Field(description="Backend, Frontend, Data, Fullstack, or Management")
+    potencial_contratacion: str = Field(description="Hiring justification")
+
+parser = JsonOutputParser(pydantic_object=PerfilEstudiante)
+
+# Prompt
+template_estudiantes = """
+Eres un Experto en Empleabilidad Joven y Reclutamiento IT.
+Analiza el CV de este estudiante y extrae los datos estructurados.
+
+UTILIZA EL SIGUIENTE FORMATO JSON:
+{format_instructions}
+
+REGLAS DE EXTRACCIÓN (Enfoque en Potencial):
+
+1. ACADÉMICO:
+   - Busca el ciclo actual (ej. "VI Ciclo", "7mo", "Egresado").
+   - Universidad: Extrae el nombre principal (ej. "UTP", "UPC").
+
+2. PROYECTOS (Clave para juniors):
+   - Extrae nombres de proyectos concretos.
+   - Busca QUÉ HIZO, no solo dónde trabajó.
+
+3. TIPO DE PERFIL:
+   - Python + Pandas -> "Data"
+   - React + Node -> "Fullstack"
+   - Java + Spring -> "Backend"
+
+TEXTO DEL CV:
+{context}
+"""
+
+prompt_extract = ChatPromptTemplate.from_template(template_estudiantes)
+chain_extract = prompt_extract | llm | parser
+
+# Batch Execution
+resultados = []
+archivos = glob.glob("cvs_estudiantes_final/*.pdf")
+
+print(f"Analyzing potential of {len(archivos)} students with AI...")
+
+for pdf in archivos:
+    try:
+        # Load PDF
+        loader = PyPDFLoader(pdf)
+        pages = loader.load()
+        texto_completo = "\n".join([p.page_content for p in pages])
+        
+        # Invoke Gemini
+        data = chain_extract.invoke({
+            "context": texto_completo,
+            "format_instructions": parser.get_format_instructions()
+        })
+        
+        # Add filename
+        data['archivo_origen'] = pdf.split("/")[-1]
+        resultados.append(data)
+        
+        print(f"Processed: {data['nombre']} ({data['ciclo_actual']}) -> {data['tipo_perfil']}")
+        
+    except Exception as e:
+        print(f"Error reading {pdf}: {e}")
+
+# Final Results
+print("\nTALENT TABLE (REVERSE MATCH):")
+df_talent = pd.DataFrame(resultados)
+
+cols = ["nombre", "universidad", "ciclo_actual", "tipo_perfil", 
+        "stack_principal", "potencial_contratacion"]
+cols_existentes = [c for c in cols if c in df_talent.columns]
+
+print(df_talent[cols_existentes])
+```
+
+```python Minimal Example
+import glob
+import pandas as pd
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
+
+class StudentProfile(BaseModel):
+    name: str = Field(description="Student name")
+    skills: list = Field(description="Technical skills")
+    profile_type: str = Field(description="Backend/Frontend/Data/Fullstack")
+
+parser = JsonOutputParser(pydantic_object=StudentProfile)
+
+results = []
+for pdf in glob.glob("*.pdf"):
+    loader = PyPDFLoader(pdf)
+    text = "\n".join([p.page_content for p in loader.load()])
+    
+    # Extract structured data (assumes chain_extract is defined)
+    data = chain_extract.invoke({
+        "context": text,
+        "format_instructions": parser.get_format_instructions()
+    })
+    results.append(data)
+
+df = pd.DataFrame(results)
+print(df)
+```
+</CodeGroup>
+
+## Data Visualization
+
+### Plotly Sunburst Chart
+
+Visualize the talent pool by university and profile type:
+
+```python
+import plotly.express as px
+
+# Prepare data for sunburst
+df_viz = df_talent[["universidad", "tipo_perfil"]].copy()
+df_viz["count"] = 1
+
+# Create hierarchical chart
+fig = px.sunburst(
+    df_viz,
+    path=["universidad", "tipo_perfil"],
+    values="count",
+    title="Talent Distribution: University → Profile Type",
+    color="universidad",
+    color_discrete_sequence=px.colors.qualitative.Set2
+)
+
+fig.update_traces(
+    textinfo="label+percent parent",
+    hovertemplate="<b>%{label}</b><br>Count: %{value}<extra></extra>"
+)
+
+fig.show()
+```
+
+<img src="/images/sunburst-example.png" alt="Sunburst chart showing talent distribution" />
+
+### Profile Type Distribution
+
+```python
+import plotly.graph_objects as go
+
+# Count by profile type
+profile_counts = df_talent["tipo_perfil"].value_counts()
+
+fig = go.Figure(data=[
+    go.Bar(
+        x=profile_counts.index,
+        y=profile_counts.values,
+        marker_color=['#3969AC', '#11A579', '#7F3C8D', '#F95700', '#E68310']
+    )
+])
+
+fig.update_layout(
+    title="Students by Profile Type",
+    xaxis_title="Profile Type",
+    yaxis_title="Number of Students",
+    showlegend=False
+)
+
+fig.show()
+```
+
+### Technology Skills Matrix
+
+```python
+import pandas as pd
+from collections import Counter
+
+# Flatten all skills
+all_skills = []
+for skills_list in df_talent["stack_principal"]:
+    all_skills.extend(skills_list)
+
+# Count frequency
+skill_freq = Counter(all_skills)
+
+# Create DataFrame
+df_skills = pd.DataFrame(
+    skill_freq.most_common(10),
+    columns=["Technology", "Frequency"]
+)
+
+print(df_skills)
+```
+
+Output:
+```
+      Technology  Frequency
+0          Python         12
+1            Java          9
+2           React          8
+3     Spring Boot          7
+4         PowerBI          6
+5  SQL (PostgreSQL)        5
+6      Git/GitHub          5
+7          Figma          4
+8         FastAPI          3
+9       C# (.NET)          2
+```
+
+## Filtering and Analysis
+
+<Tabs>
+  <Tab title="Filter by Profile Type">
+    ```python
+    # Get only Data profiles
+    data_profiles = df_talent[df_talent["tipo_perfil"] == "Data"]
+    
+    print(f"Found {len(data_profiles)} Data-focused students")
+    print(data_profiles[["nombre", "universidad", "stack_principal"]])
+    ```
+  </Tab>
+  
+  <Tab title="Filter by University">
+    ```python
+    # Students from UTP
+    utp_students = df_talent[df_talent["universidad"] == "UTP"]
+    
+    print(f"UTP students: {len(utp_students)}")
+    print(utp_students[["nombre", "ciclo_actual", "tipo_perfil"]])
+    ```
+  </Tab>
+  
+  <Tab title="Advanced Semester Students">
+    ```python
+    # Students in 8th semester or higher
+    advanced = df_talent[
+        df_talent["ciclo_actual"].str.contains("8vo|9no|10mo|Egresado")
+    ]
+    
+    print(f"Advanced students: {len(advanced)}")
+    print(advanced[["nombre", "ciclo_actual", "potencial_contratacion"]])
+    ```
+  </Tab>
+  
+  <Tab title="Skills Search">
+    ```python
+    # Students who know Python
+    python_devs = df_talent[
+        df_talent["stack_principal"].apply(
+            lambda skills: "Python" in skills
+        )
+    ]
+    
+    print(f"Python developers: {len(python_devs)}")
+    print(python_devs[["nombre", "tipo_perfil", "stack_principal"]])
+    ```
+  </Tab>
+</Tabs>
+
+## Export Results
+
+<CodeGroup>
+```python CSV Export
+# Export to CSV
+df_talent.to_csv("talent_pool.csv", index=False, encoding="utf-8")
+print("Exported to talent_pool.csv")
+```
+
+```python Excel Export
+# Export to Excel with multiple sheets
+with pd.ExcelWriter("talent_analysis.xlsx") as writer:
+    df_talent.to_excel(writer, sheet_name="All Candidates", index=False)
+    
+    # Separate sheet per profile type
+    for profile_type in df_talent["tipo_perfil"].unique():
+        df_filtered = df_talent[df_talent["tipo_perfil"] == profile_type]
+        df_filtered.to_excel(writer, sheet_name=profile_type, index=False)
+
+print("Exported to talent_analysis.xlsx")
+```
+
+```python JSON Export
+# Export as JSON
+import json
+
+with open("talent_pool.json", "w", encoding="utf-8") as f:
+    json.dump(resultados, f, ensure_ascii=False, indent=2)
+
+print("Exported to talent_pool.json")
+```
+</CodeGroup>
+
+## Ranking and Scoring
+
+Create a custom scoring system to rank candidates:
+
+```python
+def calculate_score(row):
+    """Calculate candidate score based on multiple factors"""
+    score = 0
+    
+    # Advanced semester (+10 points for 8th+)
+    if "8vo" in row["ciclo_actual"] or "9no" in row["ciclo_actual"]:
+        score += 10
+    
+    # Top universities (+5 points)
+    if row["universidad"] in ["UTP", "UPC", "UNI"]:
+        score += 5
+    
+    # Number of technologies (+2 per tech, max 10)
+    score += min(len(row["stack_principal"]) * 2, 10)
+    
+    # High-demand profile types (+8 points)
+    if row["tipo_perfil"] in ["Data", "Fullstack"]:
+        score += 8
+    
+    # Has projects (+5 per project, max 15)
+    score += min(len(row["proyectos_destacados"]) * 5, 15)
+    
+    return score
+
+# Apply scoring
+df_talent["score"] = df_talent.apply(calculate_score, axis=1)
+
+# Sort by score
+df_ranked = df_talent.sort_values("score", ascending=False)
+
+print("\nTOP 5 CANDIDATES:")
+print(df_ranked[["nombre", "universidad", "tipo_perfil", "score"]].head())
+```
+
+## Error Handling
+
+```python
+for pdf in archivos:
+    try:
+        loader = PyPDFLoader(pdf)
+        pages = loader.load()
+        texto_completo = "\n".join([p.page_content for p in pages])
+        
+        data = chain_extract.invoke({
+            "context": texto_completo,
+            "format_instructions": parser.get_format_instructions()
+        })
+        
+        # Validate required fields
+        if not data.get("nombre"):
+            print(f"Warning: No name found in {pdf}")
+            continue
+        
+        data['archivo_origen'] = pdf.split("/")[-1]
+        resultados.append(data)
+        
+        print(f"✓ Processed: {data['nombre']}")
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON parsing error in {pdf}: {e}")
+        continue
+    except Exception as e:
+        print(f"Error processing {pdf}: {e}")
+        continue
+
+if not resultados:
+    raise Exception("No CVs were successfully processed. Check error messages above.")
+```
+
+## Performance Optimization
+
+<CardGroup cols={2}>
+  <Card title="Parallel Processing" icon="bolt">
+    Use threading for faster batch processing:
+    
+    ```python
+    from concurrent.futures import ThreadPoolExecutor
+    
+    def process_cv(pdf):
+        # ... extraction logic ...
+        return data
+    
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        resultados = list(executor.map(process_cv, archivos))
+    ```
+  </Card>
+  
+  <Card title="Cache Responses" icon="database">
+    Cache LLM responses to avoid reprocessing:
+    
+    ```python
+    import hashlib
+    import pickle
+    
+    def get_cache_key(text):
+        return hashlib.md5(text.encode()).hexdigest()
+    
+    cache = {}
+    
+    key = get_cache_key(texto_completo)
+    if key in cache:
+        data = cache[key]
+    else:
+        data = chain_extract.invoke(...)
+        cache[key] = data
+    ```
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Learn about LLM and embeddings configuration
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>
