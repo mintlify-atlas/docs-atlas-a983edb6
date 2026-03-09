@@ -1,0 +1,91 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "RAG Recruitment Assistant",
+  "projectDescription": "AI-powered recruitment assistant using RAG architecture, LangChain, FAISS, and Gemini 1.5 Flash for semantic talent matching",
+  "theme": "palm",
+  "primaryColor": "#6366F1",
+  "lightColor": "#818CF8",
+  "darkColor": "#4F46E5",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/rag-architecture",
+              "concepts/reverse-matching",
+              "concepts/vector-search"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/cv-generation",
+              "guides/profile-analysis",
+              "guides/talent-mining",
+              "guides/configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "API Reference",
+            "pages": [
+              "reference/embeddings",
+              "reference/vector-store",
+              "reference/llm-integration"
+            ]
+          },
+          {
+            "group": "Data Models",
+            "pages": [
+              "reference/student-profile",
+              "reference/extraction-schema"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/basic-query",
+              "examples/batch-processing",
+              "examples/visualization"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "RAG-based semantic search using FAISS vector store",
+    "Gemini 1.5 Flash LLM integration for intelligent candidate analysis",
+    "Automated CV generation and parsing for testing",
+    "Structured data extraction from resumes with Pydantic models",
+    "Reverse matching approach prioritizing projects and potential over experience",
+    "HuggingFace embeddings for semantic similarity",
+    "Batch processing and talent mining capabilities",
+    "Interactive visualization with Plotly"
+  ],
+  "publicApiSurface": [
+    "ChatGoogleGenerativeAI - Gemini 1.5 Flash LLM wrapper",
+    "HuggingFaceEmbeddings - Sentence transformer embeddings",
+    "FAISS.from_documents() - Vector store creation",
+    "PyPDFLoader - PDF document loader",
+    "JsonOutputParser - Structured data extraction",
+    "PerfilEstudiante - Student profile Pydantic model",
+    "ChatPromptTemplate - Prompt template system",
+    "RunnablePassthrough - LangChain chain composition"
+  ]
+}
